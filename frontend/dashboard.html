@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sistema de Gestão</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body id="page-dashboard" class="bg-light">
+
+    <!-- Navbar será injetada aqui pelo app.js -->
+    <div id="navbar-placeholder"></div>
+    
+    <main class="container fade-in" id="app">
+        <header class="text-center border-bottom pb-3 mb-4">
+            <h1><i class="fas fa-chart-pie"></i> Análise de Viabilidade Econômica</h1>
+            <p class="lead text-muted">
+                Relatório para: <strong id="report-lead-name">[Selecione um Lead]</strong> | 
+                Unidade: <strong id="report-unit-name">[Selecione uma Unidade]</strong>
+            </p>
+        </header>
+
+        <section class="row text-center g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Custo Atual (Mercado Cativo)</h5>
+                        <p id="resultado-custo-atual" class="display-6 fw-bold text-primary">R$ 0,00</p>
+                        <small id="resultado-custo-atual-desc" class="text-muted">Custo total no período</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                 <div class="card h-100 bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Economia no Período</h5>
+                        <p id="resultado-economia-reais" class="display-6 fw-bold">R$ 0,00</p>
+                        <small id="resultado-economia-percentual">(0,00%)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Custo Simulado (Mercado Livre)</h5>
+                        <p id="resultado-custo-simulado" class="display-6 fw-bold text-secondary">R$ 0,00</p>
+                        <small class="text-muted">Baseado no desconto</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-chart-bar"></i> Comparativo de Custo Mensal
+            </div>
+            <div class="card-body">
+                <canvas id="simulador-grafico-economia" style="min-height: 250px;"></canvas>
+            </div>
+        </section>
+
+        <section class="card">
+             <div class="card-header">
+                <i class="fas fa-list-ol"></i> Detalhamento Mês a Mês
+            </div>
+            <div class="table-responsive">
+                <table id="detalhes-simulacao-table" class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mês</th>
+                            <th class="text-end">Custo Atual (R$)</th>
+                            <th class="text-end">Custo Simulado (R$)</th>
+                            <th class="text-end table-success">Economia (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detalhes-tbody"></tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th>Total no Período</th>
+                            <td id="total-atual" class="text-end">R$ 0,00</td>
+                            <td id="total-simulado" class="text-end">R$ 0,00</td>
+                            <td id="total-economia" class="text-end">R$ 0,00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-placeholder"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulação ACR - Sistema de Gestão</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body id="page-simulacao" class="bg-light">
+
+    <!-- Navbar será injetada aqui pelo app.js -->
+    <div id="navbar-placeholder"></div>
+    
+    <main class="container fade-in" id="app">
+        <div class="text-center mb-4">
+            <h1><i class="fas fa-calculator"></i> Simulação ACR</h1>
+            <p class="lead text-muted">Selecione os parâmetros para calcular os custos projetados.</p>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-center">
+                        <h5 class="mb-0"><i class="fas fa-file-alt"></i> Parâmetros da Simulação</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12 text-center">
+                                <label class="form-label fw-bold">Tipo de Simulação</label>
+                                <div class="btn-group w-100">
+                                    <input type="radio" class="btn-check" name="tipo_simulacao" id="tipo-cliente" value="cliente" checked>
+                                    <label class="btn btn-outline-primary" for="tipo-cliente">Cliente Existente</label>
+                                    <input type="radio" class="btn-check" name="tipo_simulacao" id="tipo-lead" value="lead">
+                                    <label class="btn btn-outline-primary" for="tipo-lead">Novo Lead (Estimado)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6"><label class="form-label">Lead / Cliente</label><select id="simulacao-lead-selector" class="form-select"><option value="">Selecione...</option></select></div>
+                            <div class="col-md-6"><label class="form-label">Unidade Consumidora</label><select id="simulacao-unidade-selector" class="form-select" disabled><option value="">Selecione um lead/cliente</option></select></div>
+                        </div>
+                        
+                        <fieldset class="mt-4 p-3 border rounded">
+                            <legend class="w-auto px-2 fs-6"><i class="fas fa-calendar-alt"></i> Período da Simulação</legend>
+                            <div class="d-flex justify-content-center gap-2 mb-3">
+                                <button class="btn btn-sm btn-outline-secondary" data-meses="12">12 meses</button>
+                                <button class="btn btn-sm btn-outline-secondary" data-meses="24">24 meses</button>
+                                <button class="btn btn-sm btn-outline-secondary" data-meses="36">36 meses</button>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6"><label class="form-label">Data de Início</label><input type="text" id="simulacao-data-inicio" class="form-control datepicker-input" readonly></div>
+                                <div class="col-md-6"><label class="form-label">Data de Fim</label><input type="text" id="simulacao-data-fim" class="form-control datepicker-input" readonly></div>
+                            </div>
+                        </fieldset>
+
+                        <div id="simulacao-dados-automaticos" class="mt-4 d-none">
+                            <h6 class="text-center text-muted"><i class="fas fa-bolt"></i> Dados da Unidade Selecionada</h6>
+                            <div class="d-flex justify-content-around text-center small bg-light p-2 rounded">
+                                <div><span class="text-muted">Tarifa:</span><br><strong id="simulacao-info-tarifa">--</strong></div>
+                                <div><span class="text-muted">Subgrupo:</span><br><strong id="simulacao-info-demanda">--</strong></div>
+                                <div><span class="text-muted">Impostos:</span><br><strong id="simulacao-info-impostos">--</strong></div>
+                                <div><span class="text-muted">Mercado:</span><br><strong id="simulacao-info-mercado">--</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button id="simulacao-calcular-btn" class="btn btn-success btn-lg" disabled>
+                                <i id="simulacao-btn-icon" class="fas fa-calculator"></i>
+                                <span id="simulacao-btn-text">Calcular Custo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="simulacao-resultado-container" class="card text-center d-none">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-line"></i> Resultado da Simulação</h5>
+                    </div>
+                    <div class="card-body">
+                        <p id="simulacao-resultado-descricao" class="text-muted">Análise para...</p>
+                        <h6 class="text-muted">Custo Total no Período</h6>
+                        <h2 id="simulacao-resultado-custo-anual" class="display-5 fw-bold mb-3">R$ 0,00</h2>
+                        <div class="row">
+                            <div class="col-4"><small class="text-muted">Custo Médio Mensal</small><p id="simulacao-resultado-custo-mensal" class="fw-bold mb-0">R$ 0,00</p></div>
+                            <div class="col-4"><small class="text-muted">Consumo Total</small><p id="simulacao-resultado-consumo-anual" class="fw-bold mb-0">0 kWh</p></div>
+                            <div class="col-4"><small class="text-muted">Demanda Média</small><p id="simulacao-resultado-demanda-media" class="fw-bold mb-0">0 kW</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal-placeholder"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

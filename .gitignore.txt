@@ -1,0 +1,15 @@
+# Cache e bytecode do Python
+__pycache__/
+*.pyc
+
+# Pastas de ambiente virtual
+venv/
+env/
+.venv/
+
+# Arquivos do VS Code
+.vscode/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
