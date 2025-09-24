@@ -2,7 +2,7 @@ import * as api from '../api/api.js';
 import * as ui from '../utils/ui.js';
 import * as helpers from '../utils/helpers.js';
 
-// Variáveis de escopo do módulo
+// --- Mapeamento de todas as variáveis do DOM ---
 let leadSelector, unidadeSelector, calcularBtn, btnIcon, btnText, dadosAutomaticos,
     infoTarifa, infoDemanda, infoImpostos, infoMercado, resultadoContainer,
     resultadoDescricao, labelCustoTotal, resultadoCustoAnual, resultadoCustoMensal,
@@ -12,100 +12,8 @@ let leadSelector, unidadeSelector, calcularBtn, btnIcon, btnText, dadosAutomatic
     historicoContainer, historicoChartCanvas, calendarContainer;
 
 let historicoChartInstance = null;
-let dadosGlobaisSimulacao = {};
 
-/**
- * Renderiza e abre o modal do calendário.
- * @param {HTMLElement} inputElement - O campo de input de data que receberá o valor.
- */
-function openCalendar(inputElement) {
-    const today = new Date();
-    const render = (year, month) => {
-        if (!calendarContainer) return;
-        calendarContainer.innerHTML = '';
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        
-        const header = document.createElement('div');
-        header.className = 'd-flex justify-content-between align-items-center p-2 bg-light border-bottom';
-        header.innerHTML = `
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
-            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
-        `;
-
-        const grid = document.createElement('div');
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
-        grid.style.gap = '5px';
-        grid.className = 'p-2';
-        ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(dia => {
-            const dayHeader = document.createElement('div');
-            dayHeader.className = 'text-center small text-muted fw-bold';
-            dayHeader.textContent = dia;
-            grid.appendChild(dayHeader);
-        });
-        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
-        for (let day = 1; day <= lastDay.getDate(); day++) {
-            const dayElement = document.createElement('button');
-            dayElement.type = 'button';
-            dayElement.className = 'btn btn-sm btn-outline-secondary';
-            dayElement.textContent = day;
-            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
-                dayElement.classList.replace('btn-outline-secondary', 'btn-primary');
-            }
-            dayElement.addEventListener('click', () => {
-                const selectedDate = new Date(year, month, day);
-                inputElement.value = selectedDate.toLocaleDateString('pt-BR');
-                ui.hideModal('calendar-modal');
-            });
-            grid.appendChild(dayElement);
-        }
-        
-        calendarContainer.appendChild(header);
-        calendarContainer.appendChild(grid);
-        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
-        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
-    };
-
-    render(today.getFullYear(), today.getMonth());
-    ui.showModal('calendar-modal');
-}
-
-async function loadLeadsIntoSelector() {
-    if (!leadSelector) return;
-    try {
-        const leads = await api.getLeads();
-        leadSelector.innerHTML = '<option value="">Selecione...</option>';
-        leads.forEach(lead => {
-            const option = new Option(`${lead.RazaoSocialLead} (${helpers.formatCpfCnpj(lead.Cpf_CnpjLead)})`, lead.Cpf_CnpjLead);
-            leadSelector.add(option);
-        });
-    } catch (error) {
-        ui.showAlert('Erro ao carregar leads.', 'error');
-    }
-}
-
-async function loadUnidadesIntoSelector(leadId) {
-    if (!unidadeSelector) return;
-    unidadeSelector.disabled = true;
-    unidadeSelector.innerHTML = '<option value="">Carregando...</option>';
-    if (!leadId) {
-        unidadeSelector.innerHTML = '<option value="">Selecione um lead</option>';
-        return;
-    }
-    try {
-        const unidades = await api.getUnidadesByLead(leadId);
-        unidadeSelector.innerHTML = '<option value="">Selecione...</option>';
-        unidades.forEach(unidade => {
-            const option = new Option(`${unidade.NumeroDaUcLead} - ${unidade.NomeDaUnidade || 'Sem Nome'}`, unidade.NumeroDaUcLead);
-            unidadeSelector.add(option);
-        });
-        unidadeSelector.disabled = false;
-    } catch (error) {
-        ui.showAlert('Erro ao carregar unidades.', 'error');
-    }
-}
+// --- Funções de Renderização e Carregamento ---
 
 function renderHistoryChart(historicoData) {
     if (historicoChartInstance) historicoChartInstance.destroy();
@@ -164,40 +72,103 @@ function displaySimulationResults(resultados) {
     if (resultadoContainer) resultadoContainer.classList.remove('d-none');
 }
 
-async function handleCalculateClick() {
-    const leadId = leadSelector.value;
-    const ucId = unidadeSelector.value;
-    const tipo = document.querySelector('input[name="tipo_simulacao"]:checked').value;
-    
-    if (!leadId || (tipo === 'cliente' && !ucId)) return ui.showAlert("Selecione um Lead/Cliente e uma Unidade.", 'error');
-    if (!dataInicioInput.value || !dataFimInput.value) return ui.showAlert("Defina o período de início e fim da simulação.", 'error');
-
-    btnText.textContent = 'Calculando...';
-    btnIcon.className = 'fas fa-spinner fa-spin';
-    calcularBtn.disabled = true;
-
-    const params = {
-        lead_id: leadId, uc_id: ucId, tipo: tipo,
-        data_inicio: dataInicioInput.value, data_fim: dataFimInput.value,
-        consumo_estimado: tipo === 'lead' ? document.getElementById('lead-consumo-estimado').value : null,
-        demanda_estimada: tipo === 'lead' ? document.getElementById('lead-demanda-estimada').value : null,
-    };
-
+async function loadLeadsIntoSelector() {
+    if (!leadSelector) return;
     try {
-        const resultados = await api.calcularSimulacao(params);
-        dadosGlobaisSimulacao.parametros = params;
-        sessionStorage.setItem('simulacaoParams', JSON.stringify(params)); // Salva para o dashboard usar
-        displaySimulationResults(resultados);
+        const leads = await api.getLeads();
+        leadSelector.innerHTML = '<option value="">Selecione...</option>';
+        leads.forEach(lead => {
+            const option = new Option(`${lead.RazaoSocialLead} (${helpers.formatCpfCnpj(lead.Cpf_CnpjLead)})`, lead.Cpf_CnpjLead);
+            leadSelector.add(option);
+        });
     } catch (error) {
-        ui.showAlert(`Falha no cálculo: ${error.message}`, 'error');
-    } finally {
-        btnText.textContent = 'Calcular Custo';
-        btnIcon.className = 'fas fa-calculator';
-        calcularBtn.disabled = false;
+        ui.showAlert('Erro ao carregar leads.', 'error');
     }
 }
 
+async function loadUnidadesIntoSelector(leadId) {
+    if (!unidadeSelector) return;
+    unidadeSelector.disabled = true;
+    unidadeSelector.innerHTML = '<option value="">Carregando...</option>';
+    if (!leadId) {
+        unidadeSelector.innerHTML = '<option value="">Selecione um lead</option>';
+        return;
+    }
+    try {
+        const unidades = await api.getUnidadesByLead(leadId);
+        unidadeSelector.innerHTML = '<option value="">Selecione...</option>';
+        unidades.forEach(unidade => {
+            const option = new Option(`${unidade.NumeroDaUcLead} - ${unidade.NomeDaUnidade || 'Sem Nome'}`, unidade.NumeroDaUcLead);
+            unidadeSelector.add(option);
+        });
+        unidadeSelector.disabled = false;
+    } catch (error) {
+        ui.showAlert('Erro ao carregar unidades.', 'error');
+    }
+}
+
+function openCalendar(inputElement) {
+    const today = new Date();
+    const render = (year, month) => {
+        if (!calendarContainer) return;
+        calendarContainer.innerHTML = '';
+        const firstDay = new Date(year, month, 1);
+        
+        const header = document.createElement('div');
+        header.className = 'd-flex justify-content-between align-items-center p-2 bg-light border-bottom';
+        header.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
+            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
+        `;
+
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+        grid.style.gap = '5px';
+        grid.className = 'p-2';
+        ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(dia => {
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'text-center small text-muted fw-bold';
+            dayHeader.textContent = dia;
+            grid.appendChild(dayHeader);
+        });
+        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
+        for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day++) {
+            const dayElement = document.createElement('button');
+            dayElement.type = 'button';
+            dayElement.className = 'btn btn-sm btn-outline-secondary';
+            dayElement.textContent = day;
+            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                dayElement.classList.replace('btn-outline-secondary', 'btn-primary');
+            }
+            dayElement.addEventListener('click', () => {
+                const selectedDate = new Date(year, month, day);
+                inputElement.value = selectedDate.toLocaleDateString('pt-BR');
+                ui.hideModal('calendar-modal');
+            });
+            grid.appendChild(dayElement);
+        }
+        
+        calendarContainer.appendChild(header);
+        calendarContainer.appendChild(grid);
+        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
+        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
+    };
+
+    render(today.getFullYear(), today.getMonth());
+    ui.showModal('calendar-modal');
+}
+
+// --- Handlers de Ações ---
+async function handleCalculateClick() {
+    // A lógica de cálculo será implementada no futuro
+    ui.showAlert("A lógica de cálculo da simulação ainda está em desenvolvimento.", "info");
+}
+
+// --- Função Principal de Inicialização ---
 export function init() {
+    // Mapeamento de elementos
     leadSelector = document.getElementById('simulacao-lead-selector');
     unidadeSelector = document.getElementById('simulacao-unidade-selector');
     calcularBtn = document.getElementById('simulacao-calcular-btn');
@@ -227,8 +198,26 @@ export function init() {
     historicoChartCanvas = document.getElementById('simulacao-historico-chart');
     calendarContainer = document.getElementById('calendar-container');
     
+    // --- Event Listeners ---
+    
     if(leadSelector) leadSelector.addEventListener('change', () => loadUnidadesIntoSelector(leadSelector.value));
+    if(calcularBtn) calcularBtn.addEventListener('click', handleCalculateClick);
 
+    if (periodoRapidoBtns) {
+        periodoRapidoBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const meses = parseInt(btn.dataset.meses, 10);
+                const hoje = new Date();
+                const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+                const fim = new Date(inicio.getFullYear(), inicio.getMonth() + meses - 1, 1);
+                const ultimoDiaDoMes = new Date(fim.getFullYear(), fim.getMonth() + 1, 0);
+                
+                if (dataInicioInput) dataInicioInput.value = inicio.toLocaleDateString('pt-BR');
+                if (dataFimInput) dataFimInput.value = ultimoDiaDoMes.toLocaleDateString('pt-BR');
+            });
+        });
+    }
+    
     if(unidadeSelector) unidadeSelector.addEventListener('change', async () => {
         const ucId = unidadeSelector.value;
         if(historicoContainer) historicoContainer.classList.add('d-none');
@@ -255,49 +244,18 @@ export function init() {
             }
         }
     });
-    
-    if(calcularBtn) calcularBtn.addEventListener('click', handleCalculateClick);
 
-    if(periodoRapidoBtns) periodoRapidoBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const meses = parseInt(btn.dataset.meses, 10);
-            const hoje = new Date();
-            const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
-            const fim = new Date(inicio.getFullYear(), inicio.getMonth() + meses - 1, 1);
-            const ultimoDiaDoMes = new Date(fim.getFullYear(), fim.getMonth() + 1, 0);
-            if(dataInicioInput) dataInicioInput.value = inicio.toLocaleDateString('pt-BR');
-            if(dataFimInput) dataFimInput.value = ultimoDiaDoMes.toLocaleDateString('pt-BR');
-        });
-    });
-
-    if(toggleDetalhesBtn) {
-        toggleDetalhesBtn.addEventListener('click', () => {
-            if(tabelaDetalhadaContainer) {
-                const isHidden = tabelaDetalhadaContainer.classList.contains('d-none');
-                tabelaDetalhadaContainer.classList.toggle('d-none');
-                toggleDetalhesBtn.textContent = isHidden ? 'Ocultar Detalhes' : 'Ver Detalhes Mensais';
+    const appContainer = document.getElementById('app');
+    if (appContainer) {
+        appContainer.addEventListener('click', (e) => {
+            const dateInput = e.target.closest('.datepicker-input');
+            if (dateInput) {
+                openCalendar(dateInput);
             }
         });
     }
 
-    if(tipoSimulacaoRadios) tipoSimulacaoRadios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const tipo = e.target.value;
-            if (tipo === 'lead' && leadInputsContainer) {
-                leadInputsContainer.classList.remove('d-none');
-            } else if(leadInputsContainer) {
-                leadInputsContainer.classList.add('d-none');
-            }
-        });
-    });
-
-    // Listener de evento global para abrir o calendário
-    document.getElementById('app').addEventListener('click', (e) => {
-        const dateInput = e.target.closest('.datepicker-input');
-        if (dateInput) {
-            openCalendar(dateInput);
-        }
-    });
-
+    // Carregamento inicial
     loadLeadsIntoSelector();
 }
+
