@@ -10,13 +10,12 @@
 </head>
 <body id="page-parametros" class="bg-light">
 
-    <!-- Navbar será injetada aqui pelo app.js -->
     <div id="navbar-placeholder"></div>
     
     <main class="container fade-in" id="app">
         <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
             <h2><i class="fas fa-cogs"></i> Parâmetros do Sistema</h2>
-            <button id="save-all-params" class="btn btn-success"><i class="fas fa-save"></i> Salvar Todos os Parâmetros</button>
+            <button id="save-all-params" class="btn btn-success"><i class="fas fa-save"></i> Salvar Parâmetros Gerais</button>
         </div>
 
         <div class="card">
@@ -27,7 +26,7 @@
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#geracao-tab">Geração</button></li>
                 </ul>
             </div>
-            <div class="card-body tab-content">
+            <div class="card-body tab-content p-4">
                 
                 <div class="tab-pane fade show active" id="simulacao-precos-tab">
                     <fieldset class="mb-4 p-3 border rounded">
@@ -38,30 +37,42 @@
                                 <div class="col-md-3 col-6"><label class="form-label">COFINS (%)</label><input type="number" step="0.01" name="Cofins" class="form-control"></div>
                                 <div class="col-md-3 col-6"><label class="form-label">Perdas (%)</label><input type="number" step="0.01" name="Perdas" class="form-control"></div>
                                 <div class="col-md-3 col-6"><label class="form-label">Preço Diesel (R$/L)</label><input type="number" step="0.01" name="PrecoDiesel" class="form-control"></div>
-                            </div>
+                                </div>
                         </form>
                     </fieldset>
                     <fieldset class="mb-4 p-3 border rounded">
                         <legend class="w-auto px-2 fs-6"><i class="fas fa-dollar-sign"></i> Tabela de Preços por MWh</legend>
-                        <div class="table-responsive"><table id="table-precos-ano" class="table table-sm table-bordered"><thead><tr><th>Ano</th><th>Fonte</th><th>Preço (R$/MWh)</th><th>Corrigir por</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                        <div class="table-responsive"><table id="table-precos-ano" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Ano</th><th>Fonte</th><th>Preço (R$/MWh)</th><th>Corrigir por</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                    </fieldset>
+                    <fieldset class="mb-4 p-3 border rounded">
+                        <legend class="w-auto px-2 fs-6"><i class="fas fa-file-invoice-dollar"></i> Tabela de Custos Base</legend>
+                        <div class="table-responsive"><table id="table-custos-mes" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Mês Ref.</th><th>Liq. MCPA-CL</th><th>Liq. MCPA-PE</th><th>Liq. Ener. Reserva</th><th>Liq. RCAP</th><th>Spread Venda</th><th>Modelagem</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
                     </fieldset>
                 </div>
                 
                 <div class="tab-pane fade" id="ajustes-tab">
                     <fieldset class="mb-4 p-3 border rounded">
                         <legend class="w-auto px-2 fs-6"><i class="fas fa-chart-line"></i> Ajuste de IPCA Anual</legend>
-                        <div class="text-end mb-2"><button id="add-ipca-btn" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Adicionar Ajuste</button></div>
-                        <div class="table-responsive"><table id="table-ajuste-ipca" class="table table-sm table-bordered"><thead><tr><th>Ano</th><th>Percentual IPCA (%)</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                        <div class="text-end mb-2"><button id="add-ipca-btn" type="button" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Adicionar Ajuste</button></div>
+                        <div class="table-responsive"><table id="table-ajuste-ipca" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Ano</th><th>Percentual IPCA (%)</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                    </fieldset>
+                    <fieldset class="mb-4 p-3 border rounded">
+                        <legend class="w-auto px-2 fs-6"><i class="fas fa-bolt"></i> Ajuste de Tarifas por Distribuidora</legend>
+                        <div class="mb-3"><select id="ajuste-tarifa-distribuidora-select" class="form-select"><option>Carregando distribuidoras...</option></select></div>
+                        <div class="table-responsive"><table id="table-ajuste-tarifa" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Ano</th><th>% TUSD kW P</th><th>% TUSD kW FP</th><th>% TUSD MWh P</th><th>% TUSD MWh FP</th><th>% TE MWh P</th><th>% TE MWh FP</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
                     </fieldset>
                 </div>
 
                 <div class="tab-pane fade" id="geracao-tab">
+                    <fieldset class="mb-4 p-3 border rounded">
+                        <legend class="w-auto px-2 fs-6"><i class="fas fa-solar-panel"></i> Dados de Geração Anual</legend>
+                        <div class="table-responsive"><table id="table-dados-geracao" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Fonte</th><th>Local</th><th>Volume (MWh/Ano)</th><th>Preço (R$/MWh)</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                    </fieldset>
                     <fieldset class="p-3 border rounded">
-                        <legend class="w-auto px-2 fs-6"><i class="fas fa-bolt"></i> Dados de Geração Anual</legend>
-                        <div class="table-responsive"><table id="table-dados-geracao" class="table table-sm table-bordered"><thead><tr><th>Fonte</th><th>Local</th><th>Volume (MWh/Ano)</th><th>Preço (R$/MWh)</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+                        <legend class="w-auto px-2 fs-6"><i class="fas fa-wave-square"></i> Curva de Sazonalização</legend>
+                        <div class="table-responsive"><table id="table-curva-geracao" class="table table-sm table-bordered table-hover"><thead class="table-light"><tr><th>Mês/Ano (ID)</th><th>Fonte</th><th>Local</th><th>% Sazonalização</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
                     </fieldset>
                 </div>
-
             </div>
         </div>
     </main>

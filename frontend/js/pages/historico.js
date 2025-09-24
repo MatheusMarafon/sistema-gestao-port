@@ -12,6 +12,7 @@ let currentAno = new Date().getFullYear();
 
 /** Carrega os leads da API e preenche o seletor de leads. */
 async function loadLeadsIntoSelector() {
+    if (!leadSelector) return;
     try {
         const leads = await api.getLeads();
         leadSelector.innerHTML = '<option value="">Selecione um Lead...</option>';
@@ -26,6 +27,7 @@ async function loadLeadsIntoSelector() {
 
 /** Carrega as unidades de um lead específico no seletor de unidades. */
 async function loadUnidadesIntoSelector(leadId) {
+    if (!unidadeSelector) return;
     unidadeSelector.disabled = true;
     unidadeSelector.innerHTML = '<option value="">Carregando...</option>';
     if (!leadId) {
@@ -47,6 +49,7 @@ async function loadUnidadesIntoSelector(leadId) {
 
 /** Renderiza a tabela de histórico de consumo. */
 function renderHistoricoTable(historicos) {
+    if (!tableBody) return;
     tableBody.innerHTML = '';
     if (!historicos || historicos.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="7" class="text-center">Nenhum histórico encontrado para ${currentAno}.</td></tr>`;
@@ -55,7 +58,7 @@ function renderHistoricoTable(historicos) {
     historicos.forEach(h => {
         const row = tableBody.insertRow();
         row.innerHTML = `
-            <td>${h.IDMes}</td>
+            <td>${helpers.formatToNomeMes(h.IDMes)}</td>
             <td>${helpers.formatNumber(h.DemandaCP)}</td>
             <td>${helpers.formatNumber(h.DemandaCFP)}</td>
             <td>${helpers.formatNumber(h.DemandaCG)}</td>
@@ -68,6 +71,7 @@ function renderHistoricoTable(historicos) {
 
 /** Carrega os dados do histórico da API e chama a função de renderização. */
 async function loadHistoricoTable() {
+    if (!tableBody) return;
     if (!currentUnidade.id || !currentAno || String(currentAno).length !== 4) {
         tableBody.innerHTML = `<tr><td colspan="7" class="text-center">Selecione uma unidade e um ano válido.</td></tr>`;
         return;
@@ -83,6 +87,7 @@ async function loadHistoricoTable() {
 
 /** Preenche o formulário de edição em lote com os dados do histórico do ano. */
 async function populateHistoricoForm() {
+    if (!formTableBody) return;
     formTableBody.innerHTML = '<tr><td colspan="17" class="text-center">Carregando...</td></tr>';
     const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     const campos = ["DemandaCP", "DemandaCFP", "DemandaCG", "kWProjPonta", "kWProjForaPonta", "kWhProjPonta", "kWhProjForaPonta", "kWhProjHRes", "kWhProjPontaG", "kWhProjForaPontaG", "kWProjG", "kWhProjDieselP", "kWhCompensadoP", "kWhCompensadoFP", "kWhCompensadoHr", "kWGeracaoProjetada"];
@@ -144,14 +149,14 @@ async function handleHistoricoSubmit(event) {
 
 /** Alterna para a tela de listagem. */
 function switchToListing() {
-    formScreen.classList.add('d-none');
-    listingScreen.classList.remove('d-none');
+    if (formScreen) formScreen.classList.add('d-none');
+    if (listingScreen) listingScreen.classList.remove('d-none');
 }
 
 /** Alterna para a tela de formulário. */
 function switchToForm() {
-    listingScreen.classList.add('d-none');
-    formScreen.classList.remove('d-none');
+    if (listingScreen) listingScreen.classList.add('d-none');
+    if (formScreen) formScreen.classList.remove('d-none');
 }
 
 /** Função de inicialização do módulo. */
@@ -212,7 +217,7 @@ export function init() {
 
     if(manageBtn) {
         manageBtn.addEventListener('click', async () => {
-            formSubtitle.textContent = `Editando histórico para a UC ${currentUnidade.id} do ano de ${currentAno}.`;
+            if(formSubtitle) formSubtitle.textContent = `Editando histórico para a UC ${currentUnidade.id} do ano de ${currentAno}.`;
             await populateHistoricoForm();
             switchToForm();
         });
@@ -223,3 +228,4 @@ export function init() {
 
     loadLeadsIntoSelector();
 }
+

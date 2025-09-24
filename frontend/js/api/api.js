@@ -154,6 +154,11 @@ export const updateCurvaGeracao = (idmes, fonte, local, data) => request(`parame
     body: JSON.stringify(data)
 });
 
+export const saveGeneralParams = (data) => request('parametros/gerais', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+});
 // --- LOCALIDADES (SERVIÇOS EXTERNOS E INTERNOS) ---
 export const getEstados = () => request('localidades/estados');
 export const getCidades = (uf) => request(`localidades/cidades/${uf}`);

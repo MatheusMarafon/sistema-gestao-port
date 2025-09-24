@@ -1,6 +1,6 @@
 /**
  * @file Ponto de Entrada Principal (Orquestrador)
- * @description Carrega componentes compartilhados (navbar, modais) e inicia o módulo da página atual.
+ * @description Carrega componentes compartilhados (navbar, modais, container de toasts) e inicia o módulo da página atual.
  */
 
 // Importa os inicializadores de cada página
@@ -13,8 +13,19 @@ import { init as initDashboardPage } from './pages/dashboard.js';
 import { init as initParametrosPage } from './pages/parametros.js';
 
 /**
+ * Cria dinamicamente o container onde as notificações (toasts) aparecerão.
+ */
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'position-fixed top-0 end-0 p-3'; 
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+}
+
+/**
  * Carrega um componente HTML de um arquivo e o injeta em um placeholder na página.
- * @param {string} componentPath - O caminho para o arquivo HTML do componente (ex: '_navbar.html').
+ * @param {string} componentPath - O caminho para o arquivo HTML do componente.
  * @param {string} placeholderId - O ID do elemento onde o HTML será injetado.
  */
 async function loadComponent(componentPath, placeholderId) {
@@ -36,9 +47,8 @@ async function loadComponent(componentPath, placeholderId) {
  * Ativa o link de navegação correspondente à página atual.
  */
 function setActiveNavLink() {
-    const currentPage = window.location.pathname.split('/').pop(); // Pega o nome do arquivo atual (ex: "leads.html")
+    const currentPage = window.location.pathname.split('/').pop();
     if (!currentPage) return;
-
     const navLinks = document.querySelectorAll('#navbarNav .nav-link');
     navLinks.forEach(link => {
         link.classList.remove('active');
@@ -52,13 +62,15 @@ function setActiveNavLink() {
  * Função principal que roda quando o DOM está pronto.
  */
 async function main() {
-    // Carrega os componentes compartilhados em paralelo para mais performance
+    // Cria o container de toasts primeiro
+    createToastContainer();
+
+    // Carrega os componentes compartilhados em paralelo
     await Promise.all([
         loadComponent('_navbar.html', 'navbar-placeholder'),
         loadComponent('_modals.html', 'modal-placeholder')
     ]);
 
-    // Ativa o link de navegação correto depois que a navbar foi carregada
     setActiveNavLink();
 
     // Inicia o script da página específica

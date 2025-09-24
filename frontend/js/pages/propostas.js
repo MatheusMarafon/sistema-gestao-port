@@ -200,8 +200,11 @@ async function handleEditClick(proposta) {
     }
 }
 
+
 async function handleDeleteClick(proposta) {
-    if (confirm(`Tem certeza que deseja excluir a proposta Nº ${proposta.NProposta}?`)) {
+    const confirmed = await ui.showConfirm(`Tem certeza que deseja excluir a proposta Nº ${proposta.NProposta}?`); 
+    
+    if (confirmed) {
         try {
             const result = await api.deleteProposta(proposta.NProposta);
             ui.showAlert(result.sucesso, 'success');

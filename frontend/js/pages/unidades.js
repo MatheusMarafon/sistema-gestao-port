@@ -12,7 +12,6 @@ let currentLead = { id: null, razaoSocial: null };
 let currentUnidade = { id: null, dados: null };
 let isEditing = false;
 
-/** Carrega os leads da API e preenche o seletor principal. */
 async function loadLeadsIntoSelector() {
     try {
         const leads = await api.getLeads();
@@ -26,10 +25,6 @@ async function loadLeadsIntoSelector() {
     }
 }
 
-/**
- * Renderiza a tabela de unidades com base nos dados fornecidos.
- * @param {Array} unidades - Lista de objetos de unidade.
- */
 function renderUnidadesTable(unidades) {
     unidadesTableBody.innerHTML = '';
     if (!unidades || unidades.length === 0) {
@@ -49,7 +44,7 @@ function renderUnidadesTable(unidades) {
             <td>${unidade.Cidade || ''}</td>
             <td>${unidade.Uf || ''}</td>
             <td>${unidade.MercadoAtual || ''}</td>
-            <td>
+            <td class="actions-cell">
                 <button type="button" class="btn btn-sm btn-warning btn-edit" title="Editar Unidade"><i class="fas fa-edit"></i></button>
                 <button type="button" class="btn btn-sm btn-danger btn-delete" title="Excluir Unidade"><i class="fas fa-trash-alt"></i></button>
             </td>
@@ -60,7 +55,6 @@ function renderUnidadesTable(unidades) {
     });
 }
 
-/** Busca as unidades de um lead específico e as renderiza. */
 async function loadUnidadesForLead(leadId) {
     unidadesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Carregando unidades...</td></tr>';
     historicoTableBody.innerHTML = '';
@@ -77,7 +71,6 @@ async function loadUnidadesForLead(leadId) {
     }
 }
 
-/** Carrega e exibe um preview do histórico da unidade selecionada. */
 async function loadHistoryPreview(ucId) {
     historicoTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Carregando histórico...</td></tr>';
     try {
@@ -90,7 +83,7 @@ async function loadHistoryPreview(ucId) {
         historicos.slice(0, 12).forEach(h => {
             const row = historicoTableBody.insertRow();
             row.innerHTML = `
-                <td class="bg-dark text-white">${h.IDMes}</td>
+                <td class="table-info">${helpers.formatToMesAno(h.IDMes)}</td>
                 <td>${helpers.formatNumber(h.DemandaCP)}</td>
                 <td>${helpers.formatNumber(h.DemandaCFP)}</td>
                 <td>${helpers.formatNumber(h.DemandaCG)}</td>
@@ -104,7 +97,6 @@ async function loadHistoryPreview(ucId) {
     }
 }
 
-/** Manipula a seleção de uma unidade na tabela. */
 function handleUnidadeSelection(unidade, rowElement) {
     currentUnidade = { id: unidade.NumeroDaUcLead, dados: unidade };
     Array.from(unidadesTableBody.querySelectorAll('tr.table-active')).forEach(row => row.classList.remove('table-active'));
@@ -112,19 +104,16 @@ function handleUnidadeSelection(unidade, rowElement) {
     loadHistoryPreview(unidade.NumeroDaUcLead);
 }
 
-/** Alterna para a tela do formulário. */
 function switchToUnidadeForm() {
     unidadesListingScreen.classList.add('d-none');
     unidadesFormScreen.classList.remove('d-none');
 }
 
-/** Alterna para a tela de listagem. */
 function switchToListing() {
     unidadesFormScreen.classList.add('d-none');
     unidadesListingScreen.classList.remove('d-none');
 }
 
-/** Limpa e reseta o formulário de unidade. */
 function resetUnidadeForm() {
     if (unidadeForm) unidadeForm.reset();
     isEditing = false;
@@ -137,7 +126,6 @@ function resetUnidadeForm() {
     }
 }
 
-/** Carrega os estados no seletor do formulário. */
 async function loadStatesForUnidade() {
     if (!ufUnidadeSelect) return;
     try {
@@ -149,7 +137,6 @@ async function loadStatesForUnidade() {
     }
 }
 
-/** Carrega as cidades no seletor com base no estado. */
 async function loadCitiesForUnidade(uf, cityCodeToSelect = null) {
     if (!cidadeUnidadeSelect) return;
     if (!uf) {
@@ -171,7 +158,6 @@ async function loadCitiesForUnidade(uf, cityCodeToSelect = null) {
     }
 }
 
-/** Manipula o evento 'blur' do CEP para buscar o endereço. */
 async function handleCepBlurForUnidade(event) {
     const cep = event.target.value;
     if (String(cep).replace(/\D/g, '').length !== 8) return;
@@ -184,7 +170,6 @@ async function handleCepBlurForUnidade(event) {
     }
 }
 
-/** Manipula o clique no botão "Adicionar Unidade". */
 function handleAddUnidadeClick() {
     if (!currentLead.id) {
         return ui.showAlert('Por favor, selecione um lead antes de adicionar uma unidade.', 'error');
@@ -195,7 +180,6 @@ function handleAddUnidadeClick() {
     switchToUnidadeForm();
 }
 
-/** Carrega os dados de uma unidade no formulário para edição. */
 async function handleEditUnidadeClick(unidade) {
     resetUnidadeForm();
     isEditing = true;
@@ -227,13 +211,19 @@ async function handleEditUnidadeClick(unidade) {
     }
 }
 
-/** Manipula o envio do formulário de unidade (criação/edição). */
 async function handleUnidadeFormSubmit(event) {
     event.preventDefault();
     const formData = new FormData(unidadeForm);
     const unidadeData = Object.fromEntries(formData.entries());
+    
     const possuiUsinaRadio = unidadeForm.querySelector('input[name="possui_usina"]:checked');
     unidadeData.PossuiUsina = possuiUsinaRadio ? possuiUsinaRadio.value === 'sim' : false;
+    
+    if (isEditing) {
+        const ucIdOriginal = document.getElementById('unidade-id-original').value;
+        unidadeData.NumeroDaUcLead = ucIdOriginal; 
+        unidadeData.Cpf_CnpjLead = currentLead.id; 
+    }
     
     if (!unidadeData.NumeroDaUcLead) {
         return ui.showAlert('O Nº da UC é obrigatório.', 'error');
@@ -241,7 +231,7 @@ async function handleUnidadeFormSubmit(event) {
 
     try {
         const result = isEditing
-            ? await api.updateUnidade(document.getElementById('unidade-id-original').value, unidadeData)
+            ? await api.updateUnidade(unidadeData.NumeroDaUcLead, unidadeData)
             : await api.saveUnidade(currentLead.id, unidadeData);
         
         ui.showAlert(result.sucesso, 'success');
@@ -252,9 +242,9 @@ async function handleUnidadeFormSubmit(event) {
     }
 }
 
-/** Manipula o clique no botão de excluir unidade. */
 async function handleDeleteUnidadeClick(unidade) {
-    if (confirm(`Tem certeza que deseja excluir a unidade ${unidade.NumeroDaUcLead}? Esta ação é irreversível.`)) {
+    const confirmed = await ui.showConfirm(`Tem certeza que deseja excluir a unidade ${unidade.NumeroDaUcLead}?`);
+    if (confirmed) {
         try {
             const result = await api.deleteUnidade(unidade.NumeroDaUcLead, currentLead.id);
             ui.showAlert(result.sucesso, 'success');
@@ -265,7 +255,6 @@ async function handleDeleteUnidadeClick(unidade) {
     }
 }
 
-/** Função de inicialização do módulo, chamada pelo app.js. */
 export function init() {
     leadSelector = document.getElementById('lead-selector');
     unidadesTableBody = document.querySelector('#unidades-table tbody');
@@ -308,3 +297,4 @@ export function init() {
     loadLeadsIntoSelector();
     if(unidadeForm) loadStatesForUnidade();
 }
+

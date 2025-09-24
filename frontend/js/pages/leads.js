@@ -12,6 +12,70 @@ let currentLeadId = null;
 let debounceTimer;
 
 /**
+ * Renderiza e abre o modal do calendário.
+ * @param {HTMLElement} inputElement - O campo de input de data que receberá o valor.
+ */
+function openCalendar(inputElement) {
+    if (!calendarContainer) return;
+
+    const today = new Date();
+    
+    const render = (year, month) => {
+        calendarContainer.innerHTML = '';
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        
+        const header = document.createElement('div');
+        header.className = 'd-flex justify-content-between align-items-center p-2 bg-light border-bottom';
+        header.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
+            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
+        `;
+
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+        grid.style.gap = '5px';
+        grid.className = 'p-2';
+
+        ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(dia => {
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'text-center small text-muted fw-bold';
+            dayHeader.textContent = dia;
+            grid.appendChild(dayHeader);
+        });
+
+        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
+
+        for (let day = 1; day <= lastDay.getDate(); day++) {
+            const dayElement = document.createElement('button');
+            dayElement.type = 'button';
+            dayElement.className = 'btn btn-sm btn-outline-secondary';
+            dayElement.textContent = day;
+            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                dayElement.classList.replace('btn-outline-secondary', 'btn-primary');
+            }
+            dayElement.addEventListener('click', () => {
+                const selectedDate = new Date(year, month, day);
+                inputElement.value = selectedDate.toLocaleDateString('pt-BR');
+                ui.hideModal('calendar-modal');
+            });
+            grid.appendChild(dayElement);
+        }
+        
+        calendarContainer.appendChild(header);
+        calendarContainer.appendChild(grid);
+
+        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
+        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
+    };
+
+    render(today.getFullYear(), today.getMonth());
+    ui.showModal('calendar-modal');
+}
+
+/**
  * Renderiza os dados dos leads na tabela HTML.
  * @param {Array} leads - A lista de objetos de lead recebida da API.
  */
@@ -34,7 +98,7 @@ function renderLeadsTable(leads) {
             <td>${lead.Contato || ''}</td>
             <td>${helpers.formatDate(lead.DataResgistroLead)}</td>
             <td>${lead.UsuriaEditorRegistro || ''}</td>
-            <td>
+            <td class="actions-cell">
                 <button type="button" class="btn btn-sm btn-info btn-vendedor" title="Vendedor/Contato"><i class="fas fa-user-tie"></i></button>
                 <button type="button" class="btn btn-sm btn-warning btn-edit" title="Editar Lead"><i class="fas fa-edit"></i></button>
             </td>
@@ -282,6 +346,14 @@ export function init() {
     if (cepInput) cepInput.addEventListener('blur', handleCepBlur);
     if (cpfCnpjInput) cpfCnpjInput.addEventListener('blur', (e) => e.target.value = helpers.formatCpfCnpj(e.target.value));
     if (ufSelect) ufSelect.addEventListener('change', () => loadCities(ufSelect.value));
+    if (vendedorContatoForm) {
+        vendedorContatoForm.addEventListener('click', (e) => {
+            const dateInput = e.target.closet('.datepicker-input');
+            if (dateInput){
+                openCalendar(dateInput);
+            }
+        });
+    }
 
     // Inicia o carregamento dos dados da página
     loadLeads();

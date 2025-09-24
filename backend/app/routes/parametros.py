@@ -10,6 +10,7 @@ bp = Blueprint("parametros", __name__, url_prefix="/api/parametros")
 
 @bp.route("", methods=["GET"])
 def get_all_parametros():
+    """Busca todos os dados de configuração para a primeira aba de Parâmetros."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão com o banco de dados."}), 500
@@ -31,7 +32,12 @@ def get_all_parametros():
         cursor.execute(
             f"SELECT * FROM [{Config.PARAM_CUSTOS_MES_TABLE}] ORDER BY MesRef DESC"
         )
-        param_custos_mes = [row_to_dict(cursor, row) for row in cursor.fetchall()]
+        param_custos_mes_raw = [row_to_dict(cursor, row) for row in cursor.fetchall()]
+        param_custos_mes = []
+        for item in param_custos_mes_raw:
+            if isinstance(item.get("MesRef"), datetime):
+                item["MesRef"] = item["MesRef"].isoformat()
+            param_custos_mes.append(item)
 
         return jsonify(
             {
@@ -50,6 +56,7 @@ def get_all_parametros():
 
 @bp.route("/ajuste-ipca", methods=["GET", "POST"])
 def handle_ajuste_ipca():
+    """Busca (GET) ou adiciona (POST) registros de ajuste de IPCA."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -77,6 +84,7 @@ def handle_ajuste_ipca():
 
 @bp.route("/ajuste-ipca/<int:ano>", methods=["PUT"])
 def update_ajuste_ipca(ano):
+    """Atualiza um registro de ajuste de IPCA existente."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -105,6 +113,7 @@ def update_ajuste_ipca(ano):
 
 @bp.route("/distribuidoras", methods=["GET"])
 def get_distribuidoras():
+    """Busca uma lista única de CNPJs de distribuidoras da tabela de tarifas."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -124,6 +133,7 @@ def get_distribuidoras():
 
 @bp.route("/ajuste-tarifa/<path:cnpj_distribuidora>", methods=["GET"])
 def get_ajuste_tarifa_por_cnpj(cnpj_distribuidora):
+    """Busca os ajustes de tarifa para uma distribuidora específica."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -144,6 +154,7 @@ def get_ajuste_tarifa_por_cnpj(cnpj_distribuidora):
 
 @bp.route("/ajuste-tarifa/<path:cnpj>/<int:ano>", methods=["PUT"])
 def update_ajuste_tarifa(cnpj, ano):
+    """Atualiza um registro de ajuste de tarifa."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -178,6 +189,7 @@ def update_ajuste_tarifa(cnpj, ano):
 
 @bp.route("/geracao", methods=["GET"])
 def get_dados_geracao():
+    """Busca os dados de Geração e Curva de Geração."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -199,6 +211,7 @@ def get_dados_geracao():
 
 @bp.route("/preco-mwh/<int:ano>/<string:fonte>", methods=["PUT"])
 def update_preco_mwh(ano, fonte):
+    """Atualiza o preço por MWh para um ano e fonte específicos."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -222,6 +235,7 @@ def update_preco_mwh(ano, fonte):
 
 @bp.route("/custos-mes/<string:mes_ref>", methods=["PUT"])
 def update_custos_mes(mes_ref):
+    """Atualiza os custos base para um mês de referência."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -258,6 +272,7 @@ def update_custos_mes(mes_ref):
 
 @bp.route("/dados-geracao/<string:fonte>/<string:local>", methods=["PUT"])
 def update_dados_geracao(fonte, local):
+    """Atualiza os dados de geração anual."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -286,6 +301,7 @@ def update_dados_geracao(fonte, local):
 
 @bp.route("/curva-geracao/<int:id_mes>/<string:fonte>/<string:local>", methods=["PUT"])
 def update_curva_geracao(id_mes, fonte, local):
+    """Atualiza a curva de sazonalização para um mês/fonte/local específico."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -309,6 +325,7 @@ def update_curva_geracao(id_mes, fonte, local):
 
 @bp.route("/simulacao", methods=["POST"])
 def save_parametros_simulacao():
+    """Salva os parâmetros gerais de simulação e os parâmetros de cliente."""
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
@@ -363,6 +380,49 @@ def save_parametros_simulacao():
     except (pyodbc.Error, ValueError) as e:
         conn.rollback()
         return jsonify({"erro": f"Ocorreu um erro inesperado: {e}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@bp.route("/gerais", methods=["PUT"])
+def update_parametros_gerais():
+    """Atualiza a única linha da tabela de parâmetros gerais de simulação."""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"erro": "Falha na conexão."}), 500
+    try:
+        data = request.json
+        sql = f"""UPDATE [{Config.PARAM_SIMULACAO_TABLE}] SET
+                      Pis = ?, Cofins = ?, PctCustoGarantia = ?, MesesGarantia = ?,
+                      Perdas = ?, FonteEnergiaBase = ?, PrecoDiesel = ?, RendimentoGerador = ?"""
+        params = (
+            to_float(data.get("Pis")),
+            to_float(data.get("Cofins")),
+            to_float(data.get("PctCustoGarantia")),
+            to_int(data.get("MesesGarantia")),
+            to_float(data.get("Perdas")),
+            data.get("FonteEnergiaBase"),
+            to_float(data.get("PrecoDiesel")),
+            to_float(data.get("RendimentoGerador")),
+        )
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        conn.commit()
+        if cursor.rowcount == 0:
+            # Se a tabela estiver vazia, podemos optar por inserir a primeira linha
+            # Esta parte é opcional e depende da regra de negócio
+            return (
+                jsonify(
+                    {
+                        "aviso": "Nenhum registro de parâmetros gerais existia para atualizar."
+                    }
+                ),
+                404,
+            )
+        return jsonify({"sucesso": "Parâmetros gerais salvos com sucesso!"})
+    except pyodbc.Error as ex:
+        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
     finally:
         if conn:
             conn.close()

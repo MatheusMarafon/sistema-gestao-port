@@ -18,3 +18,32 @@
 .result-fade-in {
     animation: fadeIn 0.6s ease-out;
 }
+
+/* ================ FORMATAÇÃO DAS COLUNAS DAS TABELAS ================ */
+/* Força os cabeçalhos (th) a não quebrarem a linha */
+.table th {
+    white-space: nowrap;
+    vertical-align: middle; /* Alinha o texto verticalmente */
+}
+
+/* Garante que as células de dados (td) também tenham um bom alinhamento */
+.table td {
+    vertical-align: middle;
+}
+
+/* Define uma largura mínima para a coluna de Ações, evitando que os botões quebrem */
+.table .actions-cell {
+    min-width: 120px; /* Ajuste este valor se precisar de mais espaço */
+    text-align: right;
+}
+
+/* =================== ESTILOS PARA NOTIFICAÇÕES (TOASTS) =================== */
+
+/* Container que vai segurar todas as notificações */
+#toast-container {
+    position: fixed; /* Fica fixo na tela mesmo com rolagem */
+    top: 1rem;       /* 16px do topo */
+    right: 1rem;     /* 16px da direita */
+    z-index: 9999;   /* Garante que fique acima de tudo */
+}
+
