@@ -13,6 +13,7 @@ let currentUnidade = { id: null, dados: null };
 let isEditing = false;
 
 async function loadLeadsIntoSelector() {
+    if (!leadSelector) return;
     try {
         const leads = await api.getLeads();
         leadSelector.innerHTML = '<option value="">Selecione um Lead...</option>';
@@ -26,6 +27,7 @@ async function loadLeadsIntoSelector() {
 }
 
 function renderUnidadesTable(unidades) {
+    if (!unidadesTableBody) return;
     unidadesTableBody.innerHTML = '';
     if (!unidades || unidades.length === 0) {
         unidadesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhuma unidade cadastrada para este lead.</td></tr>';
@@ -56,6 +58,7 @@ function renderUnidadesTable(unidades) {
 }
 
 async function loadUnidadesForLead(leadId) {
+    if (!unidadesTableBody || !historicoTableBody) return;
     unidadesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Carregando unidades...</td></tr>';
     historicoTableBody.innerHTML = '';
     currentUnidade = { id: null, dados: null };
@@ -72,6 +75,7 @@ async function loadUnidadesForLead(leadId) {
 }
 
 async function loadHistoryPreview(ucId) {
+    if (!historicoTableBody) return;
     historicoTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Carregando histórico...</td></tr>';
     try {
         const historicos = await api.getHistoricoCompleto(ucId);
@@ -83,7 +87,7 @@ async function loadHistoryPreview(ucId) {
         historicos.slice(0, 12).forEach(h => {
             const row = historicoTableBody.insertRow();
             row.innerHTML = `
-                <td class="table-info">${helpers.formatToMesAno(h.IDMes)}</td>
+                <td class="bg-light text-black">${helpers.formatToMesAno(h.IDMes)}</td>
                 <td>${helpers.formatNumber(h.DemandaCP)}</td>
                 <td>${helpers.formatNumber(h.DemandaCFP)}</td>
                 <td>${helpers.formatNumber(h.DemandaCG)}</td>
@@ -195,7 +199,8 @@ async function handleEditUnidadeClick(unidade) {
                     await loadCitiesForUnidade(unidadeData.Uf, unidadeData.Cidade);
                 } else if (key === 'PossuiUsina') {
                     const radioValue = unidadeData[key] ? 'sim' : 'nao';
-                    unidadeForm.querySelector(`input[name="possui_usina"][value="${radioValue}"]`).checked = true;
+                    const radioToCheck = unidadeForm.querySelector(`input[name="possui_usina"][value="${radioValue}"]`);
+                    if(radioToCheck) radioToCheck.checked = true;
                 } else {
                     input.value = unidadeData[key] || '';
                 }

@@ -14,6 +14,7 @@
     --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
     --card-hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     --border-radius: 0.5rem;
+    --border-color: #dee2e6;
 }
 
 /* ==========================================================================
@@ -128,37 +129,64 @@ h1, h2, h3 {
     text-align: right;
 }
 
-.table > thead.table-dark th{ 
+/* Regra para os cabeçalhos das tabelas de listagem (Leads, Unidades, etc.) */
+.table > thead.table-dark th { 
     background-color: #42424a !important;
-    color: #fff;
+    color: #fff !important;
+    border-color: #515961 !important;
 }
 
-/* Aplica bordas arredondadas aos containers das tabelas dentro dos fieldsets */
-fieldset .table-responsive {
-    border-radius: var(--border-radius); /* Usa a variável que já definimos */
+.card .table-responsive {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     overflow: hidden; /* Essencial para que as bordas da tabela não "escapem" */
 }
 /* ==========================================================================
-   SCROLLBAR PERSONALIZADO
+   ESTILOS ESPECÍFICOS PARA A TABELA DE EDIÇÃO DE HISTÓRICO
+   ========================================================================== */
+
+/* 1. Arredonda as bordas do container da tabela de edição */
+#historico-form .table-responsive {
+    border-radius: var(--border-radius);
+    overflow: hidden; /* Crucial para cortar as bordas da tabela */
+    border: 1px solid var(--border-color);
+}
+
+/* 2. Aplica a cor personalizada ao cabeçalho da tabela de edição */
+#historico-input-table > thead th {
+    background-color: #42424a !important;
+    color: #ffffff !important;
+}
+
+/* 3. Estiliza os inputs DENTRO da tabela de edição */
+#historico-input-table input {
+    width: 100%;
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    text-align: center;
+    padding: 0.25rem 0.1rem;
+    background-color: #fff;
+    transition: all 0.2s ease-in-out;
+}
+
+#historico-input-table input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem var(--primary-glow);
+    outline: none;
+}
+
+/* ==========================================================================
+   SCROLLBAR E ESTILOS TEMÁTICOS (JÁ ESTAVAM CORRETOS)
    ========================================================================== */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--subtle-grey); }
 ::-webkit-scrollbar-thumb { background: #bdc3c7; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #95a5a6; }
 
-
-/* ==========================================================================
-   ESTILOS TEMÁTICOS (ENERGIA) 
-   ========================================================================== */
-
 .btn-primary:hover, .btn-primary:focus {
     box-shadow: 0 0 15px 5px var(--primary-glow);
 }
 
-.card {
-    position: relative;
-    overflow: hidden;
-}
 .card::after {
     content: '';
     position: absolute;
@@ -205,3 +233,4 @@ a:hover .fa-regular, button:hover .fa-regular {
     color: var(--primary-color);
     text-shadow: 0 0 8px var(--primary-glow);
 }
+

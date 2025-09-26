@@ -1,10 +1,13 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db_connection
-from app.utils import row_to_dict, to_float
-from app.services.validation_service import validar_regras_tarifacao
+from app.utils import (
+    row_to_dict,
+    to_float,
+)  # Garante que 'to_float' está a ser importado
 from config import Config
 import pyodbc
 from datetime import datetime
+from app.services.validation_service import validar_regras_tarifacao
 
 bp = Blueprint("unidades", __name__, url_prefix="/api")
 
@@ -49,6 +52,7 @@ def handle_unidades_by_lead(lead_id):
                 data.get("Complemento"),
                 data.get("Bairro"),
                 data.get("Uf"),
+                # --- CORREÇÃO DE TIPO DE DADOS ---
                 to_float(data.get("Cidade")),
                 data.get("Cep"),
                 data.get("MercadoAtual"),
@@ -129,6 +133,7 @@ def update_or_delete_unidade(uc_id_original):
                 data.get("Complemento"),
                 data.get("Bairro"),
                 data.get("Uf"),
+                # --- CORREÇÃO DE TIPO DE DADOS ---
                 to_float(data.get("Cidade")),
                 data.get("Cep"),
                 data.get("MercadoAtual"),
@@ -307,9 +312,10 @@ def batch_update_historico(uc_id):
         conn.commit()
         return jsonify({"sucesso": f"Histórico para o ano {ano} salvo com sucesso!"})
 
-    except (ValueError, pyodbc.Error) as e:
+    except Exception as e:
         conn.rollback()
-        return jsonify({"erro": f"Erro ao salvar histórico: {e}"}), 500
+        print(f"[ERRO CRÍTICO EM BATCH UPDATE]: {e}")
+        return jsonify({"erro": f"Ocorreu um erro inesperado no servidor: {e}"}), 500
     finally:
         if conn:
             conn.autocommit = True

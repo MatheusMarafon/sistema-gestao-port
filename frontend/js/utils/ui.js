@@ -1,6 +1,6 @@
 /**
  * @file Módulo de UI
- * @description Centraliza funções de manipulação da interface do utilizador (modais, toasts, etc.).
+ * @description Centraliza funções de manipulação da interface do utilizador (modais, toasts, calendário, etc.).
  */
 
 /**
@@ -31,7 +31,6 @@ export function hideModal(modalId) {
 
 /**
  * Exibe uma notificação "toast" elegante do Bootstrap.
- * Substitui o alert() padrão.
  * @param {string} message A mensagem a ser exibida.
  * @param {'success'|'error'|'info'} type O tipo de notificação, que define a cor e o ícone.
  */
@@ -80,9 +79,8 @@ export function showConfirm(message) {
         const bodyText = document.getElementById('confirm-modal-body-text');
         const okBtn = document.getElementById('confirm-modal-ok-btn');
 
-        // Fallback para o confirm nativo se os elementos do modal não forem encontrados
         if (!confirmModalEl || !bodyText || !okBtn) {
-            resolve(confirm(message));
+            resolve(confirm(message)); // Fallback para o confirm nativo
             return;
         }
 
@@ -96,20 +94,74 @@ export function showConfirm(message) {
             modal.hide();
         };
 
-        // Usa .cloneNode para remover listeners antigos e evitar múltiplos cliques
         const newOkBtn = okBtn.cloneNode(true);
         okBtn.parentNode.replaceChild(newOkBtn, okBtn);
         newOkBtn.addEventListener('click', onConfirm);
 
-        // O evento 'hidden.bs.modal' só é disparado DEPOIS que a animação de fecho termina
         confirmModalEl.addEventListener('hidden.bs.modal', () => {
-            // Remove o listener para limpar a memória
             newOkBtn.removeEventListener('click', onConfirm);
-            // Agora que tudo está fechado, resolve a promessa com a decisão do utilizador
             resolve(userConfirmation);
-        }, { once: true }); // O listener só executa uma vez
+        }, { once: true });
 
         modal.show();
     });
+}
+
+/**
+ * Renderiza e abre o modal do calendário para um campo de input específico.
+ * @param {HTMLElement} inputElement - O campo de input que receberá a data.
+ */
+export function openCalendar(inputElement) {
+    const calendarContainer = document.getElementById('calendar-container');
+    if (!calendarContainer) {
+        return console.error("Elemento #calendar-container não encontrado no DOM.");
+    }
+
+    const today = new Date();
+    
+    const render = (year, month) => {
+        calendarContainer.innerHTML = '';
+        const firstDay = new Date(year, month, 1);
+        
+        const monthHeader = document.createElement('div');
+        monthHeader.className = 'd-flex justify-content-between align-items-center pb-2';
+        monthHeader.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
+            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
+        `;
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;';
+        
+        ['D','S','T','Q','Q','S','S'].forEach(dia => {
+            grid.innerHTML += `<div class='text-center small text-muted fw-bold'>${dia}</div>`;
+        });
+
+        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
+
+        for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day++) {
+            const dayBtn = document.createElement('button');
+            dayBtn.type = 'button';
+            dayBtn.className = 'btn btn-sm btn-outline-secondary';
+            dayBtn.textContent = day;
+            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                dayBtn.classList.replace('btn-outline-secondary', 'btn-primary');
+            }
+            dayBtn.addEventListener('click', () => {
+                inputElement.value = new Date(year, month, day).toLocaleDateString('pt-BR');
+                hideModal('calendar-modal');
+            });
+            grid.appendChild(dayBtn);
+        }
+        
+        calendarContainer.appendChild(monthHeader);
+        calendarContainer.appendChild(grid);
+        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
+        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
+    };
+
+    render(today.getFullYear(), today.getMonth());
+    showModal('calendar-modal');
 }
 
