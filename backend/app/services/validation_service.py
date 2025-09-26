@@ -11,70 +11,84 @@ def validar_regras_tarifacao(dados_unidade, dados_historico_mes):
     """
     subgrupo = dados_unidade.get("SubgrupoTarifario", "").upper()
     tarifa = dados_unidade.get("Tarifa", "").upper()
-    possui_usina = bool(dados_unidade.get("PossuiUsina", False))
+    possui_usina = bool(
+        dados_unidade.get("possuiUsina", False)
+    )  # Usado para GD ou geração própria
 
-    campos_de_dados = [
-        "DemandaCP",
-        "DemandaCFP",
-        "DemandaCG",
-        "kWhProjPonta",
-        "kWhProjForaPonta",
-        "kWhProjPontaG",
-        "kWhProjForaPontaG",
-        "kWProjG",
-        "kWhCompensadoP",
-        "kWhCompensadoFP",
-        "kWhCompensadoHr",
-        "kWGeracaoProjetada",
-        "kWhProjDieselP",
-    ]
-
-    # Verifica se existe algum dado preenchido para o mês
-    tem_dados_no_mes = any(
-        to_float(dados_historico_mes.get(campo)) for campo in campos_de_dados
-    )
+    is_rural_irrigante = to_float(dados_unidade.get("BeneficioRuralIrrigacao", 0)) > 0
+    tem_gerador_diesel = to_float(dados_historico_mes.get("kWhProjDieselP", 0)) > 0
 
     is_grupo_a = subgrupo.startswith("A")
     is_grupo_b = subgrupo.startswith("B")
     is_tarifa_azul = "AZUL" in tarifa
     is_tarifa_verde = "VERDE" in tarifa
 
-    # --- Regra 1: Campos que DEVEM ser zero sob certas condições ---
+    # --- Regras de 'Quando deve ser 0' ---
     regras_de_zeramento = {
-        "DemandaCP": is_grupo_b or is_tarifa_verde,
-        "DemandaCFP": is_grupo_b,
-        "DemandaCG": is_grupo_b or not possui_usina,
-        "kWhProjPonta": is_grupo_b or is_tarifa_verde,
+        # Condição para a regra: kW Proj Ponta e Fora Ponta
+        # Devem ser zero se a Tarifa for Verde ou se for Grupo B
+        "kWProjPonta": is_tarifa_verde or is_grupo_b,
+        "kWProjForaPonta": is_tarifa_verde or is_grupo_b,
+        # Condição para a regra: kWh Proj Ponta e Fora Ponta
+        # Devem ser zero se a Tarifa for Verde ou se for Grupo B
+        "kWhProjPonta": is_tarifa_verde or is_grupo_b,
+        "kWhProjForaPonta": is_tarifa_verde or is_grupo_b,
+        # Condição para a regra: kWh Proj HRes
+        # Deve ser zero se a classe NÃO for Rural Irrigante
+        "kWhProjHRes": not is_rural_irrigante,
+        # Condição para a regra: kWh Compensado Hr
+        # deve ser zero se NÃO for GD e NÃO for Rural Irrigante
+        "kWhCompensadoHr": not possui_usina and not is_rural_irrigante,
+        # Condição para a regra: kWh Proj Diesel P
+        # Deve ser zero se não houver gerador a diesel
+        "kWhProjDieselP": not tem_gerador_diesel,
+        # Condição par aa regra: Todos os campos de Geração (G) e Compensado (P, FP)
+        # Deve ser zero se não houver GD (se a unidade não possui usina)
+        "kWhProjPontaG": not possui_usina,
+        "kWhProjForaPontaG": not possui_usina,
+        "kWProjG": not possui_usina,
+        "kWhCompensadoP": not possui_usina,
+        "kWhCompensadoFP": not possui_usina,
+        "kWGeracaoProjetada": not possui_usina,
     }
-
     for campo, condicao_para_zerar in regras_de_zeramento.items():
         valor_campo = to_float(dados_historico_mes.get(campo))
         if condicao_para_zerar and valor_campo and valor_campo != 0:
             raise ValueError(
-                f"O campo '{campo}' deve ser zero para as condições atuais (Subgrupo: {subgrupo}, Tarifa: {tarifa}, Possui Usina: {possui_usina})."
+                f"O campo '{campo}' deve ser zero para as condições atuais da unidade."
             )
 
-    # --- Regra 2: Campos que SÃO OBRIGATÓRIOS (se houver dados no mês) ---
+    # --- Regras de 'Condições de Uso' (Campos Obrigatórios) ---
+    # Verifica se o usuário inseriu algum dado para o mês
+    # Se o mês estiver todo em branco, as regras de obrigatoriedade não são aplicadas
+    campos_de_dados = list(regras_de_zeramento.keys()) + [
+        "DemandaCP",
+        "DemandaCFP",
+        "DemandaCG",
+    ]
+    tem_dados_no_mes = any(
+        to_float(dados_historico_mes.get(campo)) for campo in campos_de_dados
+    )
+
     if tem_dados_no_mes:
+        # Condição para a regra: Demanda CFP (Obrigatória se Grupo A + Tarifa Azul|Verde)
         if is_grupo_a and (is_tarifa_azul or is_tarifa_verde):
-            valor_demanda_cfp = to_float(dados_historico_mes.get("DemandaCFP"))
-            if not valor_demanda_cfp or valor_demanda_cfp <= 0:
+            if not to_float(dados_historico_mes.get("DemandaCFP")):
                 raise ValueError(
-                    "O campo 'Demanda CFP' é obrigatório e deve ser maior que zero para Grupo A com Tarifa Azul ou Verde."
+                    "O campo 'Demanda CFP' é obrigatório para o Grupo A com Tarifa Azul ou Verde."
                 )
 
+        # Condição para a regra: Demanda CP (Obrigatória se Grupo A + Tarifa Azul)
         if is_grupo_a and is_tarifa_azul:
-            valor_demanda_cp = to_float(dados_historico_mes.get("DemandaCP"))
-            if not valor_demanda_cp or valor_demanda_cp <= 0:
+            if not to_float(dados_historico_mes.get("DemandaCP")):
                 raise ValueError(
-                    "O campo 'Demanda CP' é obrigatório e deve ser maior que zero para Grupo A com Tarifa Azul."
+                    "O campo 'Demanda CP' é obrigatório apara o Grupo A com Tarifa Azul."
                 )
 
+        # Condição para a regra: Demanda CG (Obrigatória se possui usina)
         if possui_usina:
-            valor_demanda_cg = to_float(dados_historico_mes.get("DemandaCG"))
-            if not valor_demanda_cg or valor_demanda_cg <= 0:
+            if not to_float(dados_historico_mes.get("DemandaCG")):
                 raise ValueError(
-                    "O campo 'Demanda CG' é obrigatório e deve ser maior que zero pois a unidade possui usina."
+                    "O campo 'Demanda CG' é obrigatório pois a unidade possui usina."
                 )
-
     return True

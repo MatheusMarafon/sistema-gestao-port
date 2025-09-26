@@ -2,92 +2,24 @@ import * as api from '../api/api.js';
 import * as ui from '../utils/ui.js';
 import * as helpers from '../utils/helpers.js';
 
-// Variáveis de escopo do módulo
+// --- Variáveis de escopo do módulo ---
 let listingScreen, formScreen, addLeadBtn, backBtn, refreshBtn, filterInput,
     tableBody, leadForm, formTitle, cpfCnpjInput, cepInput, ufSelect, cidadeSelect,
-    clearLeadBtn, vendedorContatoForm;
+    clearLeadBtn;
 
 let isEditing = false;
 let currentLeadId = null;
 let debounceTimer;
 
-/**
- * Renderiza e abre o modal do calendário.
- * @param {HTMLElement} inputElement - O campo de input de data que receberá o valor.
- */
-function openCalendar(inputElement) {
-    if (!calendarContainer) return;
+// --- Funções de Renderização ---
 
-    const today = new Date();
-    
-    const render = (year, month) => {
-        calendarContainer.innerHTML = '';
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        
-        const header = document.createElement('div');
-        header.className = 'd-flex justify-content-between align-items-center p-2 bg-light border-bottom';
-        header.innerHTML = `
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
-            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
-        `;
-
-        const grid = document.createElement('div');
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
-        grid.style.gap = '5px';
-        grid.className = 'p-2';
-
-        ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(dia => {
-            const dayHeader = document.createElement('div');
-            dayHeader.className = 'text-center small text-muted fw-bold';
-            dayHeader.textContent = dia;
-            grid.appendChild(dayHeader);
-        });
-
-        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
-
-        for (let day = 1; day <= lastDay.getDate(); day++) {
-            const dayElement = document.createElement('button');
-            dayElement.type = 'button';
-            dayElement.className = 'btn btn-sm btn-outline-secondary';
-            dayElement.textContent = day;
-            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
-                dayElement.classList.replace('btn-outline-secondary', 'btn-primary');
-            }
-            dayElement.addEventListener('click', () => {
-                const selectedDate = new Date(year, month, day);
-                inputElement.value = selectedDate.toLocaleDateString('pt-BR');
-                ui.hideModal('calendar-modal');
-            });
-            grid.appendChild(dayElement);
-        }
-        
-        calendarContainer.appendChild(header);
-        calendarContainer.appendChild(grid);
-
-        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
-        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
-    };
-
-    render(today.getFullYear(), today.getMonth());
-    ui.showModal('calendar-modal');
-}
-
-/**
- * Renderiza os dados dos leads na tabela HTML.
- * @param {Array} leads - A lista de objetos de lead recebida da API.
- */
 function renderLeadsTable(leads) {
-    if (!tableBody) return; // Verificação de segurança
-    
+    if (!tableBody) return;
     tableBody.innerHTML = '';
     if (!leads || leads.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum lead encontrado.</td></tr>';
         return;
     }
-
     leads.forEach(lead => {
         const row = tableBody.insertRow();
         row.innerHTML = `
@@ -103,15 +35,13 @@ function renderLeadsTable(leads) {
                 <button type="button" class="btn btn-sm btn-warning btn-edit" title="Editar Lead"><i class="fas fa-edit"></i></button>
             </td>
         `;
-        
         row.querySelector('.btn-vendedor').addEventListener('click', (e) => { e.stopPropagation(); handleVendedorClick(lead); });
         row.querySelector('.btn-edit').addEventListener('click', (e) => { e.stopPropagation(); handleEditClick(lead.Cpf_CnpjLead); });
     });
 }
 
-/**
- * Busca os leads na API e chama a função de renderização.
- */
+// --- Funções de Lógica e Carregamento de Dados ---
+
 async function loadLeads() {
     try {
         if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Carregando...</td></tr>';
@@ -124,56 +54,38 @@ async function loadLeads() {
     }
 }
 
-/**
- * Carrega a lista de estados (UF) para o seletor.
- */
 async function loadStates() {
     if (!ufSelect) return;
     try {
         const estados = await api.getEstados();
         ufSelect.innerHTML = '<option value="">Selecione...</option>';
-        estados.forEach(uf => {
-            ufSelect.add(new Option(uf, uf));
-        });
+        estados.forEach(uf => ufSelect.add(new Option(uf, uf)));
     } catch (error) {
         ui.showAlert('Erro ao carregar estados.', 'error');
     }
 }
 
-/**
- * Carrega a lista de cidades com base na UF selecionada.
- * @param {string} uf - A sigla do estado.
- * @param {string} [cityToSelect=null] - O nome da cidade a ser pré-selecionada.
- */
-async function loadCities(uf, cityToSelect = null) {
+async function loadCities(uf, cityCodeToSelect = null) {
     if (!cidadeSelect) return;
     if (!uf) {
         cidadeSelect.innerHTML = '<option value="">Selecione um estado</option>';
         cidadeSelect.disabled = true;
         return;
     }
-    
     cidadeSelect.disabled = false;
     cidadeSelect.innerHTML = '<option value="">Carregando...</option>';
-    
     try {
         const cidades = await api.getCidades(uf);
         cidadeSelect.innerHTML = '<option value="">Selecione...</option>';
-        cidades.forEach(cidade => {
-            cidadeSelect.add(new Option(cidade.Cidade, cidade.Codigo));
-        });
-        if (cityToSelect) {
-            const opt = Array.from(cidadeSelect.options).find(o => o.text.toUpperCase() === cityToSelect.toUpperCase());
-            if (opt) cidadeSelect.value = opt.value;
+        cidades.forEach(cidade => cidadeSelect.add(new Option(cidade.Cidade, cidade.Codigo)));
+        if (cityCodeToSelect) {
+            cidadeSelect.value = cityCodeToSelect;
         }
     } catch (error) {
         ui.showAlert('Erro ao carregar cidades.', 'error');
     }
 }
 
-/**
- * Manipula o evento 'blur' do campo CEP para buscar o endereço.
- */
 async function handleCepBlur(event) {
     const cep = event.target.value;
     if (String(cep).replace(/\D/g, '').length !== 8) return;
@@ -183,26 +95,23 @@ async function handleCepBlur(event) {
             leadForm.querySelector('[name="Logradouro"]').value = data.logradouro || '';
             leadForm.querySelector('[name="Bairro"]').value = data.bairro || '';
             if (ufSelect) ufSelect.value = data.uf;
-            await loadCities(data.uf, data.localidade);
+            await loadCities(data.uf, data.ibge);
         }
     } catch (error) {
         ui.showAlert('Erro ao buscar informações do CEP.', 'error');
     }
 }
 
-/** Alterna a visualização da listagem para o formulário. */
 function switchToForm() {
     listingScreen.classList.add('d-none');
     formScreen.classList.remove('d-none');
 }
 
-/** Alterna a visualização do formulário para a listagem. */
 function switchToList() {
     formScreen.classList.add('d-none');
     listingScreen.classList.remove('d-none');
 }
 
-/** Limpa o formulário e reseta o estado de edição. */
 function resetForm() {
     if (leadForm) leadForm.reset();
     isEditing = false;
@@ -215,17 +124,12 @@ function resetForm() {
     }
 }
 
-/**
- * Busca os dados de um lead e preenche o formulário para edição.
- * @param {string} leadId - O CPF/CNPJ do lead a ser editado.
- */
 async function handleEditClick(leadId) {
     resetForm();
     isEditing = true;
     currentLeadId = leadId;
     if (formTitle) formTitle.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
     switchToForm();
-
     try {
         const leadData = await api.getLeadById(leadId);
         if (leadForm) {
@@ -234,7 +138,7 @@ async function handleEditClick(leadId) {
                 if (input) {
                     if (key === 'Uf') {
                         input.value = leadData[key];
-                        await loadCities(leadData[key], leadData.Cidade);
+                        await loadCities(leadData.Uf, leadData.Cidade);
                     } else if (key === 'DataResgistroLead') {
                         input.value = helpers.formatDate(leadData[key]);
                     } else if (key === 'Cep') {
@@ -253,11 +157,14 @@ async function handleEditClick(leadId) {
     }
 }
 
-/** Manipula o envio do formulário, seja para criar ou atualizar um lead. */
 async function handleFormSubmit(event) {
     event.preventDefault();
     const formData = new FormData(leadForm);
     const leadData = Object.fromEntries(formData.entries());
+
+    if (isEditing) {
+        leadData.Cpf_CnpjLead = currentLeadId;
+    }
 
     if (!leadData.Cpf_CnpjLead || !leadData.RazaoSocialLead) {
         return ui.showAlert('CPF/CNPJ e Razão Social são obrigatórios.', 'error');
@@ -277,9 +184,12 @@ async function handleFormSubmit(event) {
     }
 }
 
-/** Abre e preenche o modal de Vendedor/Contato. */
 function handleVendedorClick(lead) {
-    if (!vendedorContatoForm) return;
+    const vendedorContatoForm = document.getElementById('vendedor-contato-form');
+    if (!vendedorContatoForm) {
+        return console.error("ERRO: Formulário do modal 'vendedor-contato-form' não foi encontrado no DOM!");
+    }
+    
     currentLeadId = lead.Cpf_CnpjLead;
     vendedorContatoForm.reset();
     
@@ -293,11 +203,11 @@ function handleVendedorClick(lead) {
     ui.showModal('vendedor-modal');
 }
 
-/** Manipula o envio do formulário do modal de Vendedor/Contato. */
 async function handleVendedorSubmit(event) {
     event.preventDefault();
-    if (!currentLeadId) return ui.showAlert('Nenhum lead selecionado.', 'error');
-    
+    const vendedorContatoForm = document.getElementById('vendedor-contato-form');
+    if (!currentLeadId || !vendedorContatoForm) return;
+
     const formData = new FormData(vendedorContatoForm);
     const data = Object.fromEntries(formData.entries());
     
@@ -311,11 +221,8 @@ async function handleVendedorSubmit(event) {
     }
 }
 
-/**
- * Função de inicialização do módulo, chamada pelo app.js.
- */
 export function init() {
-    // Mapeia os elementos do DOM para as variáveis do módulo
+    // Mapeia os elementos do DOM
     listingScreen = document.getElementById('cadastro-listing-screen');
     formScreen = document.getElementById('cadastro-form-screen');
     addLeadBtn = document.getElementById('add-lead-btn');
@@ -330,32 +237,39 @@ export function init() {
     ufSelect = document.getElementById('uf');
     cidadeSelect = document.getElementById('cidade');
     clearLeadBtn = document.getElementById('clear-lead-button');
-    vendedorContatoForm = document.getElementById('vendedor-contato-form');
+    
+    // Adiciona listener para o formulário do modal APENAS quando ele existir
+    const vendedorContatoForm = document.getElementById('vendedor-contato-form');
+    if (vendedorContatoForm) {
+        vendedorContatoForm.addEventListener('submit', handleVendedorSubmit);
+    }
 
-    // Garante que os elementos essenciais existem antes de adicionar listeners
+    // Adiciona os outros listeners
     if (addLeadBtn) addLeadBtn.addEventListener('click', () => { resetForm(); switchToForm(); });
     if (backBtn) backBtn.addEventListener('click', switchToList);
     if (clearLeadBtn) clearLeadBtn.addEventListener('click', () => { isEditing ? switchToList() : resetForm(); });
     if (refreshBtn) refreshBtn.addEventListener('click', loadLeads);
     if (leadForm) leadForm.addEventListener('submit', handleFormSubmit);
-    if (vendedorContatoForm) vendedorContatoForm.addEventListener('submit', handleVendedorSubmit);
-    if (filterInput) filterInput.addEventListener('keyup', () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(loadLeads, 400);
+    
+    document.body.addEventListener('click', (e) => {
+        const dateInput = e.target.closest('.datepicker-input');
+        if (dateInput) {
+            ui.openCalendar(dateInput);
+        }
     });
+
+    if (filterInput) {
+        filterInput.addEventListener('keyup', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadLeads, 400);
+        });
+    }
     if (cepInput) cepInput.addEventListener('blur', handleCepBlur);
     if (cpfCnpjInput) cpfCnpjInput.addEventListener('blur', (e) => e.target.value = helpers.formatCpfCnpj(e.target.value));
     if (ufSelect) ufSelect.addEventListener('change', () => loadCities(ufSelect.value));
-    if (vendedorContatoForm) {
-        vendedorContatoForm.addEventListener('click', (e) => {
-            const dateInput = e.target.closet('.datepicker-input');
-            if (dateInput){
-                openCalendar(dateInput);
-            }
-        });
-    }
-
+    
     // Inicia o carregamento dos dados da página
     loadLeads();
     loadStates();
 }
+

@@ -29,7 +29,6 @@ def handle_unidades_by_lead(lead_id):
             if not data.get("NumeroDaUcLead"):
                 return jsonify({"erro": "O Nº da UC é obrigatório"}), 400
 
-            # Validação usa a própria `data` pois não há histórico ainda
             validar_regras_tarifacao(data, data)
 
             sql = f"""INSERT INTO [{Config.UNIDADES_TABLE}] 
@@ -38,6 +37,7 @@ def handle_unidades_by_lead(lead_id):
                        AliquotaICMS, AplicaContaEHidrica, LiminarICMSDemanda, LiminarICMSTusd, BeneficioRuralIrrigacao, 
                        RuralOuSazoReconhecida, SaldoMaisRecenteSCEE, PossuiUsina, DataRegistroUC) 
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
             params = (
                 lead_id,
                 data.get("NumeroDaUcLead"),
@@ -49,7 +49,7 @@ def handle_unidades_by_lead(lead_id):
                 data.get("Complemento"),
                 data.get("Bairro"),
                 data.get("Uf"),
-                data.get("Cidade"),
+                to_float(data.get("Cidade")),
                 data.get("Cep"),
                 data.get("MercadoAtual"),
                 data.get("SubgrupoTarifario"),
@@ -97,7 +97,7 @@ def get_unidade_by_id(uc_id):
             return jsonify({"erro": "Unidade Consumidora não encontrada."}), 404
         return jsonify(row_to_dict(cursor, unidade_row))
     except pyodbc.Error as e:
-        return jsonify({"erro": f"Erro de banco de dados: {e}"}), 500
+        return jsonify({"erro": f"Ocorreu um erro interno: {e}"}), 500
     finally:
         if conn:
             conn.close()
@@ -114,11 +114,11 @@ def update_or_delete_unidade(uc_id_original):
         if request.method == "PUT":
             validar_regras_tarifacao(data, data)
             sql = f"""UPDATE [{Config.UNIDADES_TABLE}] SET 
-                      NumeroDaUcLead = ?, CnpjDistribuidora = ?, CnpjDaUnidadeConsumidora = ?, NomeDaUnidade = ?, 
-                      Logradouro = ?, Numero = ?, Complemento = ?, Bairro = ?, Uf = ?, Cidade = ?, Cep = ?, 
-                      MercadoAtual = ?, SubgrupoTarifario = ?, Tarifa = ?, AliquotaICMS = ?, AplicaContaEHidrica = ?, 
-                      LiminarICMSDemanda = ?, LiminarICMSTusd = ?, BeneficioRuralIrrigacao = ?, RuralOuSazoReconhecida = ?, 
-                      SaldoMaisRecenteSCEE = ?, PossuiUsina = ? WHERE NumeroDaUcLead = ? AND Cpf_CnpjLead = ?"""
+                        NumeroDaUcLead = ?, CnpjDistribuidora = ?, CnpjDaUnidadeConsumidora = ?, NomeDaUnidade = ?, 
+                        Logradouro = ?, Numero = ?, Complemento = ?, Bairro = ?, Uf = ?, Cidade = ?, Cep = ?, 
+                        MercadoAtual = ?, SubgrupoTarifario = ?, Tarifa = ?, AliquotaICMS = ?, AplicaContaEHidrica = ?, 
+                        LiminarICMSDemanda = ?, LiminarICMSTusd = ?, BeneficioRuralIrrigacao = ?, RuralOuSazoReconhecida = ?, 
+                        SaldoMaisRecenteSCEE = ?, PossuiUsina = ? WHERE NumeroDaUcLead = ? AND Cpf_CnpjLead = ?"""
             params = (
                 data.get("NumeroDaUcLead"),
                 data.get("CnpjDistribuidora"),
@@ -129,7 +129,7 @@ def update_or_delete_unidade(uc_id_original):
                 data.get("Complemento"),
                 data.get("Bairro"),
                 data.get("Uf"),
-                data.get("Cidade"),
+                to_float(data.get("Cidade")),
                 data.get("Cep"),
                 data.get("MercadoAtual"),
                 data.get("SubgrupoTarifario"),

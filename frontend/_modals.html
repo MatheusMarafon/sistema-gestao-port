@@ -1,25 +1,41 @@
 <!-- =================== MODAIS GLOBAIS =================== -->
 
 <!-- Modal Vendedor e Contato -->
-<div class="modal fade" id="vendedor-modal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="vendedor-modal" tabindex="-1" aria-labelledby="vendedorModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-user-tie"></i> Vendedor e Contato</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="vendedorModalLabel"><i class="fas fa-user-tie"></i> Vendedor e Contato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="vendedor-contato-form">
-                    <!-- Conteúdo do formulário -->
+                    <fieldset class="mb-3 p-3 border rounded">
+                        <legend class="w-auto px-2 fs-6">Vendedor Responsável</legend>
+                        <div class="row g-3">
+                            <div class="col-12"><label class="form-label">Vendedor*</label><input type="text" name="Vendedor" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Data de Envio*</label><input type="text" name="DataEnvio" class="form-control datepicker-input" readonly></div>
+                            <div class="col-md-6"><label class="form-label">Validade do Lead*</label><input type="text" name="DataValidade" class="form-control datepicker-input" readonly></div>
+                        </div>
+                    </fieldset>
+                     <fieldset class="p-3 border rounded">
+                        <legend class="w-auto px-2 fs-6">Contato Principal</legend>
+                        <div class="row g-3">
+                           <div class="col-12"><label class="form-label">Nome do Contato*</label><input type="text" name="NomeContato" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">E-mail</label><input type="email" name="Email" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Telefone</label><input type="tel" name="Telefone" class="form-control"></div>
+                        </div>
+                    </fieldset>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <button type="submit" form="vendedor-contato-form" class="btn btn-primary">Salvar</button>
+                <button id="save-vendedor-contato" type="submit" form="vendedor-contato-form" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
             </div>
         </div>
     </div>
 </div>
+
 
 <!-- Modal Genérico para Calendário -->
 <div class="modal fade" id="calendar-modal" tabindex="-1" aria-hidden="true">

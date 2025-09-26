@@ -12,6 +12,8 @@ import { init as initSimulacaoPage } from './pages/simulacao.js';
 import { init as initDashboardPage } from './pages/dashboard.js';
 import { init as initParametrosPage } from './pages/parametros.js';
 
+
+
 /**
  * Cria dinamicamente o container onde as notificações (toasts) aparecerão.
  */

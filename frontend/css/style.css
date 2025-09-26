@@ -1,49 +1,207 @@
-/* Animação para o conteúdo da página surgir suavemente */
+/* --- Importação da Fonte --- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ==========================================================================
+   VARIÁVEIS DE CORES E ESTILOS GLOBAIS
+   ========================================================================== */
+:root {
+    --primary-color: #0d6efd;
+    --primary-glow: rgba(13, 110, 253, 0.4);
+    --light-bg: #f8f9fa;
+    --subtle-grey: #e9ecef;
+    --text-dark: #212529;
+    --text-light: #6c757d;
+    --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+    --card-hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    --border-radius: 0.5rem;
+}
+
+/* ==========================================================================
+   ESTILOS GERAIS E MELHORIAS VISUAIS
+   ========================================================================== */
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-image: linear-gradient(180deg, #ffffff 0%, var(--light-bg) 100%);
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px); /* Opcional: faz o conteúdo "subir" um pouco */
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .fade-in {
-    animation: fadeIn 0.4s ease-in-out;
-}
-
-/* Para o card de resultado da simulação */
-.result-fade-in {
     animation: fadeIn 0.6s ease-out;
 }
 
-/* ================ FORMATAÇÃO DAS COLUNAS DAS TABELAS ================ */
-/* Força os cabeçalhos (th) a não quebrarem a linha */
-.table th {
-    white-space: nowrap;
-    vertical-align: middle; /* Alinha o texto verticalmente */
+.card {
+    box-shadow: var(--card-shadow);
+    border: none;
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+}
+.card:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+.navbar.bg-dark {
+    background: linear-gradient(90deg, #42424a 0%, #42424a 100%) !important;
+    border-bottom: 2px solid var(--primary-color);
 }
 
-/* Garante que as células de dados (td) também tenham um bom alinhamento */
-.table td {
+.navbar .nav-link {
+    transition: all 0.3s ease;
+    padding-bottom: 5px;
+    margin: 0 5px;
+}
+
+.navbar .nav-link:hover {
+    color: #fff !important;
+}
+
+.navbar .nav-link.active {
+    color: #fff !important;
+    font-weight: 500;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 var(--primary-glow); }
+    70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
+}
+
+.btn-primary {
+    animation: pulse 2.5s infinite;
+}
+
+.btn {
+    border-radius: var(--border-radius);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.form-control, .form-select {
+    border-radius: var(--border-radius);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem var(--primary-glow);
+}
+
+
+/* ==========================================================================
+   REGRAS PARA TABELAS
+   ========================================================================== */
+
+.table th {
+    white-space: nowrap;
     vertical-align: middle;
 }
 
-/* Define uma largura mínima para a coluna de Ações, evitando que os botões quebrem */
+.table td {
+    vertical-align: middle;
+    color: var(--text-light);
+}
+
+.table-hover > tbody > tr {
+    transition: background-color 0.2s ease-in-out;
+}
+.table-hover > tbody > tr:hover {
+    background-color: var(--subtle-grey);
+}
+.table-hover > tbody > tr:hover td {
+    color: var(--text-dark);
+}
+
 .table .actions-cell {
-    min-width: 120px; /* Ajuste este valor se precisar de mais espaço */
+    min-width: 120px;
     text-align: right;
 }
 
-/* =================== ESTILOS PARA NOTIFICAÇÕES (TOASTS) =================== */
-
-/* Container que vai segurar todas as notificações */
-#toast-container {
-    position: fixed; /* Fica fixo na tela mesmo com rolagem */
-    top: 1rem;       /* 16px do topo */
-    right: 1rem;     /* 16px da direita */
-    z-index: 9999;   /* Garante que fique acima de tudo */
+.table > thead.table-dark th{ 
+    background-color: #42424a !important;
+    color: #fff;
 }
 
+/* Aplica bordas arredondadas aos containers das tabelas dentro dos fieldsets */
+fieldset .table-responsive {
+    border-radius: var(--border-radius); /* Usa a variável que já definimos */
+    overflow: hidden; /* Essencial para que as bordas da tabela não "escapem" */
+}
+/* ==========================================================================
+   SCROLLBAR PERSONALIZADO
+   ========================================================================== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--subtle-grey); }
+::-webkit-scrollbar-thumb { background: #bdc3c7; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #95a5a6; }
+
+
+/* ==========================================================================
+   ESTILOS TEMÁTICOS (ENERGIA) 
+   ========================================================================== */
+
+.btn-primary:hover, .btn-primary:focus {
+    box-shadow: 0 0 15px 5px var(--primary-glow);
+}
+
+.card {
+    position: relative;
+    overflow: hidden;
+}
+.card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 3px;
+    background-color: var(--primary-color);
+    transition: all 0.4s ease-in-out;
+    transform: translateX(-50%);
+}
+.card:hover::after {
+    width: 80%;
+}
+
+.navbar .nav-link {
+    position: relative;
+    text-decoration: none;
+}
+.navbar .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: var(--primary-color);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+}
+.navbar .nav-link:hover::after,
+.navbar .nav-link.active::after {
+    transform: scaleX(1);
+}
+
+.fas, .fa-solid, .fa-regular {
+    transition: all 0.3s ease;
+    color: var(--text-light);
+}
+a:hover .fas, button:hover .fas,
+a:hover .fa-solid, button:hover .fa-solid,
+a:hover .fa-regular, button:hover .fa-regular {
+    color: var(--primary-color);
+    text-shadow: 0 0 8px var(--primary-glow);
+}

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db_connection
-from app.utils import row_to_dict
+from app.utils import row_to_dict, to_int
 from config import Config
 import pyodbc
 from datetime import datetime
@@ -59,7 +59,7 @@ def handle_leads():
                 novo_lead.get("Complemento"),
                 novo_lead.get("Bairro"),
                 novo_lead.get("Uf"),
-                novo_lead.get("Cidade"),
+                to_int(novo_lead.get("Cidade")),
                 novo_lead.get("Cep"),
                 datetime.now(),
                 novo_lead.get("UsuriaEditorRegistro"),
@@ -108,7 +108,7 @@ def handle_lead_by_id(lead_id):
                 dados_lead.get("Complemento"),
                 dados_lead.get("Bairro"),
                 dados_lead.get("Uf"),
-                dados_lead.get("Cidade"),
+                to_int(dados_lead.get("Cidade")),
                 dados_lead.get("Cep"),
                 dados_lead.get("UsuriaEditorRegistro"),
                 lead_id,
@@ -128,12 +128,14 @@ def handle_lead_by_id(lead_id):
 
 @bp.route("/<path:lead_id>/vendedor-contato", methods=["POST"])
 def add_vendedor_contato(lead_id):
+    """Adiciona ou atualiza as informações de vendedor e contato para um lead."""
     data = request.json
     conn = get_db_connection()
     if not conn:
         return jsonify({"erro": "Falha na conexão."}), 500
     try:
         cursor = conn.cursor()
+        # Limpa os registos antigos para garantir que a informação é sempre a mais recente (upsert)
         cursor.execute(
             f"DELETE FROM [{Config.VENDEDORES_TABLE}] WHERE Cpf_CnpjLead = ?", lead_id
         )
@@ -141,6 +143,7 @@ def add_vendedor_contato(lead_id):
             f"DELETE FROM [{Config.CONTATOS_TABLE}] WHERE Cpf_CnpjLead = ?", lead_id
         )
 
+        # Insere os novos dados do vendedor, se existirem
         if data.get("Vendedor"):
             try:
                 data_envio = (
@@ -160,6 +163,7 @@ def add_vendedor_contato(lead_id):
             except (ValueError, TypeError) as e:
                 return jsonify({"erro": f"Formato de data inválido: {e}"}), 400
 
+        # Insere os novos dados do contato, se existirem
         if data.get("NomeContato"):
             sql_contato = f"INSERT INTO [{Config.CONTATOS_TABLE}] (Cpf_CnpjLead, NomeContato, [e-mail], Telefone) VALUES (?, ?, ?, ?)"
             cursor.execute(
@@ -175,6 +179,7 @@ def add_vendedor_contato(lead_id):
             jsonify({"sucesso": "Informações de Vendedor/Contato salvas com sucesso!"}),
             201,
         )
+
     except pyodbc.Error as ex:
         return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
     finally:
