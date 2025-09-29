@@ -234,3 +234,62 @@ a:hover .fa-regular, button:hover .fa-regular {
     text-shadow: 0 0 8px var(--primary-glow);
 }
 
+/* ==========================================================================
+   ESTILOS PARA O PAINEL DE DETALHES (SLIDE-IN PANEL) - NOVO CÓDIGO
+   ========================================================================== */
+
+/* Fundo escuro semitransparente */
+.details-panel-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1040; /* Abaixo do painel, mas acima do resto */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s 0.3s;
+}
+
+.details-panel-backdrop.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease;
+}
+
+/* O painel em si */
+.details-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    max-width: 400px; /* Largura do painel */
+    height: 100%;
+    background-color: #fff;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+    z-index: 1050; /* Acima do backdrop */
+    transform: translateX(100%); /* Começa escondido à direita */
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    display: flex;
+    flex-direction: column;
+}
+
+.details-panel.is-open {
+    transform: translateX(0); /* Posição final (visível) */
+}
+
+/* Estilos do cabeçalho e corpo do painel */
+.details-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.details-panel-body {
+    padding: 1.5rem;
+    overflow-y: auto; /* Adiciona scroll se o conteúdo for muito grande */
+    flex-grow: 1;
+}

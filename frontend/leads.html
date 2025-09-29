@@ -35,8 +35,7 @@
                             <th>Vendedor</th>
                             <th>Contato</th>
                             <th>Data Registro</th>
-                            <th>Usuário</th>
-                            <th>Ações</th>
+                            <th class="actions-cell">Ações</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -74,7 +73,40 @@
             </form>
         </div>
     </main>
+    <!-- Backdrop (fundo escuro) para o painel -->
+    <div class="details-panel-backdrop" id="details-panel-backdrop"></div>
 
+    <!-- O painel em si -->
+    <div class="details-panel" id="lead-details-panel">
+        <div class="details-panel-header">
+            <h5 id="panel-lead-name">Detalhes do Lead</h5>
+            <button type="button" class="btn-close" id="close-details-panel" aria-label="Close"></button>
+        </div>
+        <div class="details-panel-body">
+            <!-- Placeholder para o spinner de carregamento -->
+            <div id="panel-loading-spinner" class="text-center p-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">A carregar...</span>
+                </div>
+            </div>
+            <!-- Conteúdo dos detalhes (começa escondido) -->
+            <div id="panel-content" class="d-none">
+                <div class="mb-3">
+                    <small class="text-muted">Razão Social</small>
+                    <p class="fw-bold mb-0" id="panel-razao-social"></p>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted">CPF/CNPJ</small>
+                    <p class="mb-0" id="panel-cpf-cnpj"></p>
+                </div>
+                <hr>
+                <h6><i class="fas fa-plug me-2"></i> Unidades Consumidoras</h6>
+                <ul class="list-group list-group-flush" id="panel-unidades-list">
+                    <!-- A lista de unidades será inserida aqui pelo JavaScript -->
+                </ul>
+            </div>
+        </div>
+    </div>
     <!-- Placeholder para injetar o conteúdo do _modals.html -->
     <div id="modal-placeholder"></div>
 

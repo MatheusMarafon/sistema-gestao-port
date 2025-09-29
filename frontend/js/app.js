@@ -4,6 +4,7 @@
  */
 
 // Importa os inicializadores de cada página
+import { init as initLoginPage } from './pages/login.js';
 import { init as initLeadsPage } from './pages/leads.js';
 import { init as initUnidadesPage } from './pages/unidades.js';
 import { init as initHistoricoPage } from './pages/historico.js';
@@ -78,6 +79,7 @@ async function main() {
     // Inicia o script da página específica
     const pageId = document.body.id;
     switch (pageId) {
+        case 'page-login': initLoginPage(); break;
         case 'page-leads': initLeadsPage(); break;
         case 'page-unidades': initUnidadesPage(); break;
         case 'page-historico': initHistoricoPage(); break;

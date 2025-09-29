@@ -2,7 +2,7 @@ import * as api from '../api/api.js';
 import * as ui from '../utils/ui.js';
 import * as helpers from '../utils/helpers.js';
 
-// Variáveis de escopo do módulo
+// --- Variáveis de escopo do módulo ---
 let listingScreen, formScreen, leadSelector, unidadeSelector, anoSelector,
     tableBody, manageBtn, backBtn, historicoForm, formSubtitle, formTableBody;
 
@@ -10,7 +10,8 @@ let currentLeadId = null;
 let currentUnidade = { id: null, dados: null };
 let currentAno = new Date().getFullYear();
 
-/** Carrega os leads da API e preenche o seletor de leads. */
+// --- Funções de Renderização e Lógica ---
+
 async function loadLeadsIntoSelector() {
     if (!leadSelector) return;
     try {
@@ -25,7 +26,6 @@ async function loadLeadsIntoSelector() {
     }
 }
 
-/** Carrega as unidades de um lead específico no seletor de unidades. */
 async function loadUnidadesIntoSelector(leadId) {
     if (!unidadeSelector) return;
     unidadeSelector.disabled = true;
@@ -47,7 +47,6 @@ async function loadUnidadesIntoSelector(leadId) {
     }
 }
 
-/** Renderiza a tabela de histórico de consumo. */
 function renderHistoricoTable(historicos) {
     if (!tableBody) return;
     tableBody.innerHTML = '';
@@ -69,23 +68,76 @@ function renderHistoricoTable(historicos) {
     });
 }
 
-/** Carrega os dados do histórico da API e chama a função de renderização. */
 async function loadHistoricoTable() {
     if (!tableBody) return;
     if (!currentUnidade.id || !currentAno || String(currentAno).length !== 4) {
         tableBody.innerHTML = `<tr><td colspan="7" class="text-center">Selecione uma unidade e um ano válido.</td></tr>`;
         return;
     }
-    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Carregando histórico...</td></tr>';
+    
+    ui.showSpinner(tableBody.parentElement);
     try {
         const historicos = await api.getHistoricoPorAno(currentUnidade.id, currentAno);
         renderHistoricoTable(historicos);
     } catch (error) {
         ui.showAlert(`Erro ao carregar histórico: ${error.message}`, 'error');
+    } finally {
+        ui.hideSpinner(tableBody.parentElement);
     }
 }
 
-/** Preenche o formulário de edição em lote com os dados do histórico do ano. */
+/**
+ * Aplica as regras de negócio diretamente nos inputs da tabela de edição,
+ * desabilitando os campos que não devem ser preenchidos.
+ */
+function aplicarRegrasNosInputs() {
+    if (!currentUnidade.dados || !formTableBody) return;
+
+    const unidade = currentUnidade.dados;
+    const subgrupo = (unidade.SubgrupoTarifario || "").toUpperCase();
+    const tarifa = (unidade.Tarifa || "").toUpperCase();
+    const possuiUsina = unidade.PossuiUsina;
+
+    const isGrupoB = subgrupo.startsWith('B');
+    const isTarifaVerde = tarifa.includes('VERDE');
+
+    const rows = formTableBody.querySelectorAll('tr');
+
+    rows.forEach(row => {
+        const inputs = Object.fromEntries(
+            Array.from(row.querySelectorAll('input')).map(input => {
+                const nameMatch = input.name.match(/\[(.*?)\]/g);
+                if (nameMatch && nameMatch[1]) {
+                    const name = nameMatch[1].replace(/\[|\]/g, '');
+                    return [name, input];
+                }
+                return [null, null];
+            }).filter(entry => entry[0])
+        );
+        
+        Object.values(inputs).forEach(input => {
+            input.disabled = false;
+            input.placeholder = '0,00';
+        });
+
+        const regras = {
+            DemandaCP: isGrupoB || isTarifaVerde,
+            DemandaCFP: isGrupoB,
+            DemandaCG: isGrupoB || !possuiUsina,
+            kWhProjPonta: isGrupoB || isTarifaVerde,
+        };
+
+        for (const campo in regras) {
+            if (regras[campo] && inputs[campo]) {
+                inputs[campo].disabled = true;
+                inputs[campo].value = '';
+                inputs[campo].placeholder = 'N/A';
+            }
+        }
+    });
+}
+
+
 async function populateHistoricoForm() {
     if (!formTableBody) return;
     formTableBody.innerHTML = '<tr><td colspan="17" class="text-center">Carregando...</td></tr>';
@@ -107,12 +159,14 @@ async function populateHistoricoForm() {
             });
             row.innerHTML = rowHTML;
         }
+        
+        aplicarRegrasNosInputs();
+
     } catch (error) {
         ui.showAlert(`Erro ao buscar histórico para edição: ${error.message}`, 'error');
     }
 }
 
-/** Manipula o envio do formulário de histórico. */
 async function handleHistoricoSubmit(event) {
     event.preventDefault();
     const dadosHistorico = [];
@@ -147,19 +201,16 @@ async function handleHistoricoSubmit(event) {
     }
 }
 
-/** Alterna para a tela de listagem. */
 function switchToListing() {
     if (formScreen) formScreen.classList.add('d-none');
     if (listingScreen) listingScreen.classList.remove('d-none');
 }
 
-/** Alterna para a tela de formulário. */
 function switchToForm() {
     if (listingScreen) listingScreen.classList.add('d-none');
     if (formScreen) formScreen.classList.remove('d-none');
 }
 
-/** Função de inicialização do módulo. */
 export function init() {
     listingScreen = document.getElementById('historico-listing-screen');
     formScreen = document.getElementById('historico-form-screen');
@@ -183,7 +234,7 @@ export function init() {
     if(leadSelector) {
         leadSelector.addEventListener('change', async (e) => {
             currentLeadId = e.target.value;
-            if(tableBody) tableBody.innerHTML = '';
+            if(tableBody) tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Selecione uma unidade.</td></tr>';
             if(manageBtn) manageBtn.disabled = true;
             if(unidadeSelector) unidadeSelector.disabled = true;
             if(anoSelector) anoSelector.disabled = true;

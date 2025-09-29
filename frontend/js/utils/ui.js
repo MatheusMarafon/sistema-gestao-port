@@ -3,10 +3,6 @@
  * @description Centraliza funções de manipulação da interface do utilizador (modais, toasts, calendário, etc.).
  */
 
-/**
- * Exibe um modal do Bootstrap pelo seu ID.
- * @param {string} modalId O ID do modal (ex: 'vendedor-modal')
- */
 export function showModal(modalId) {
     const modalElement = document.getElementById(modalId);
     if (modalElement) {
@@ -15,10 +11,6 @@ export function showModal(modalId) {
     }
 }
 
-/**
- * Esconde um modal do Bootstrap pelo seu ID.
- * @param {string} modalId O ID do modal
- */
 export function hideModal(modalId) {
     const modalElement = document.getElementById(modalId);
     if (modalElement) {
@@ -29,11 +21,6 @@ export function hideModal(modalId) {
     }
 }
 
-/**
- * Exibe uma notificação "toast" elegante do Bootstrap.
- * @param {string} message A mensagem a ser exibida.
- * @param {'success'|'error'|'info'} type O tipo de notificação, que define a cor e o ícone.
- */
 export function showAlert(message, type = 'success') {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
@@ -68,11 +55,6 @@ export function showAlert(message, type = 'success') {
     toast.show();
 }
 
-/**
- * Exibe um modal de confirmação e espera a resposta do utilizador.
- * @param {string} message - A pergunta a ser exibida no corpo do modal.
- * @returns {Promise<boolean>} - Retorna uma promessa que resolve para 'true' se o utilizador confirmar, e 'false' caso contrário.
- */
 export function showConfirm(message) {
     return new Promise((resolve) => {
         const confirmModalEl = document.getElementById('confirm-modal');
@@ -80,7 +62,7 @@ export function showConfirm(message) {
         const okBtn = document.getElementById('confirm-modal-ok-btn');
 
         if (!confirmModalEl || !bodyText || !okBtn) {
-            resolve(confirm(message)); // Fallback para o confirm nativo
+            resolve(confirm(message));
             return;
         }
 
@@ -107,10 +89,6 @@ export function showConfirm(message) {
     });
 }
 
-/**
- * Renderiza e abre o modal do calendário para um campo de input específico.
- * @param {HTMLElement} inputElement - O campo de input que receberá a data.
- */
 export function openCalendar(inputElement) {
     const calendarContainer = document.getElementById('calendar-container');
     if (!calendarContainer) {
@@ -163,5 +141,50 @@ export function openCalendar(inputElement) {
 
     render(today.getFullYear(), today.getMonth());
     showModal('calendar-modal');
+}
+
+// ================== FUNÇÕES DO SPINNER ADICIONADAS AQUI ==================
+
+/**
+ * Exibe um overlay de carregamento com um spinner sobre um elemento.
+ * @param {HTMLElement} element - O elemento que ficará com o overlay (ex: o corpo de uma tabela).
+ */
+export function showSpinner(element) {
+    if (!element) return;
+
+    // Garante que o elemento pai possa conter o overlay
+    element.classList.add('loading-container');
+
+    // Remove qualquer spinner antigo para evitar duplicação
+    const existingOverlay = element.querySelector('.loading-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `<i class="fas fa-spinner fa-spin spinner-icon"></i>`;
+    
+    element.appendChild(overlay);
+
+    // Adiciona a classe 'visible' após um pequeno delay para permitir a transição CSS
+    setTimeout(() => overlay.classList.add('visible'), 10);
+}
+
+/**
+ * Esconde o overlay de carregamento de um elemento.
+ * @param {HTMLElement} element - O elemento que contém o spinner.
+ */
+export function hideSpinner(element) {
+    if (!element) return;
+    const overlay = element.querySelector('.loading-overlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+        // Remove o elemento do DOM após a transição de desaparecimento
+        setTimeout(() => {
+            overlay.remove();
+            element.classList.remove('loading-container');
+        }, 300);
+    }
 }
 

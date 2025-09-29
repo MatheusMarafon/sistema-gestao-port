@@ -7,21 +7,82 @@ let listingScreen, formScreen, addLeadBtn, backBtn, refreshBtn, filterInput,
     tableBody, leadForm, formTitle, cpfCnpjInput, cepInput, ufSelect, cidadeSelect,
     clearLeadBtn;
 
+// Variáveis para o novo painel de detalhes
+let detailsPanel, panelBackdrop, closePanelBtn, panelLeadName, panelCpfCnpj,
+    panelRazaoSocial, panelUnidadesList, panelLoadingSpinner, panelContent;
+
 let isEditing = false;
 let currentLeadId = null;
 let debounceTimer;
 
-// --- Funções de Renderização ---
+
+// --- Funções do Painel de Detalhes ---
+
+/** Mostra o painel de detalhes com uma animação. */
+function showDetailsPanel() {
+    if (detailsPanel && panelBackdrop) {
+        panelBackdrop.classList.add('is-visible');
+        detailsPanel.classList.add('is-open');
+    }
+}
+
+/** Esconde o painel de detalhes com uma animação. */
+function hideDetailsPanel() {
+    if (detailsPanel && panelBackdrop) {
+        panelBackdrop.classList.remove('is-visible');
+        detailsPanel.classList.remove('is-open');
+    }
+}
+
+/** Preenche o painel com os dados do lead e suas unidades. */
+async function populateDetailsPanel(lead) {
+    // Mostra o spinner e esconde o conteúdo
+    panelLoadingSpinner.classList.remove('d-none');
+    panelContent.classList.add('d-none');
+    
+    // Preenche as informações básicas do lead
+    panelLeadName.textContent = lead.NomeFantasia || lead.RazaoSocialLead;
+    panelCpfCnpj.textContent = helpers.formatCpfCnpj(lead.Cpf_CnpjLead);
+    panelRazaoSocial.textContent = lead.RazaoSocialLead;
+    panelUnidadesList.innerHTML = ''; // Limpa a lista de unidades anterior
+
+    try {
+        const unidades = await api.getUnidadesByLead(lead.Cpf_CnpjLead);
+        
+        if (unidades.length === 0) {
+            panelUnidadesList.innerHTML = '<li class="list-group-item">Nenhuma unidade cadastrada.</li>';
+        } else {
+            unidades.forEach(unidade => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = `${unidade.NumeroDaUcLead} - ${unidade.NomeDaUnidade || 'Sem Nome'}`;
+                panelUnidadesList.appendChild(li);
+            });
+        }
+    } catch (error) {
+        ui.showAlert('Erro ao buscar unidades para o painel.', 'error');
+        panelUnidadesList.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar unidades.</li>';
+    } finally {
+        // Esconde o spinner e mostra o conteúdo
+        panelLoadingSpinner.classList.add('d-none');
+        panelContent.classList.remove('d-none');
+    }
+}
+
+
+// --- Funções Principais da Página ---
 
 function renderLeadsTable(leads) {
     if (!tableBody) return;
     tableBody.innerHTML = '';
     if (!leads || leads.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum lead encontrado.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum lead encontrado.</td></tr>';
         return;
     }
+
     leads.forEach(lead => {
         const row = tableBody.insertRow();
+        row.style.cursor = 'pointer';
         row.innerHTML = `
             <td>${helpers.formatCpfCnpj(lead.Cpf_CnpjLead)}</td>
             <td>${lead.RazaoSocialLead || ''}</td>
@@ -29,28 +90,35 @@ function renderLeadsTable(leads) {
             <td>${lead.Vendedor || ''}</td>
             <td>${lead.Contato || ''}</td>
             <td>${helpers.formatDate(lead.DataResgistroLead)}</td>
-            <td>${lead.UsuriaEditorRegistro || ''}</td>
             <td class="actions-cell">
                 <button type="button" class="btn btn-sm btn-info btn-vendedor" title="Vendedor/Contato"><i class="fas fa-user-tie"></i></button>
                 <button type="button" class="btn btn-sm btn-warning btn-edit" title="Editar Lead"><i class="fas fa-edit"></i></button>
             </td>
         `;
+        
         row.querySelector('.btn-vendedor').addEventListener('click', (e) => { e.stopPropagation(); handleVendedorClick(lead); });
         row.querySelector('.btn-edit').addEventListener('click', (e) => { e.stopPropagation(); handleEditClick(lead.Cpf_CnpjLead); });
+        
+        // Listener para o clique na linha (abre o painel)
+        row.addEventListener('click', () => {
+            showDetailsPanel();
+            populateDetailsPanel(lead);
+        });
     });
 }
 
-// --- Funções de Lógica e Carregamento de Dados ---
-
 async function loadLeads() {
+    if (!tableBody) return;
+    ui.showSpinner(tableBody.parentElement);
     try {
-        if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Carregando...</td></tr>';
         const filterValue = filterInput ? filterInput.value : '';
         const leads = await api.getLeads(filterValue);
         renderLeadsTable(leads);
     } catch (error) {
         ui.showAlert(`Erro ao carregar leads: ${error.message}`, 'error');
-        if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Falha ao carregar dados.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Falha ao carregar dados.</td></tr>';
+    } finally {
+        ui.hideSpinner(tableBody.parentElement);
     }
 }
 
@@ -161,20 +229,14 @@ async function handleFormSubmit(event) {
     event.preventDefault();
     const formData = new FormData(leadForm);
     const leadData = Object.fromEntries(formData.entries());
-
     if (isEditing) {
         leadData.Cpf_CnpjLead = currentLeadId;
     }
-
     if (!leadData.Cpf_CnpjLead || !leadData.RazaoSocialLead) {
         return ui.showAlert('CPF/CNPJ e Razão Social são obrigatórios.', 'error');
     }
-
     try {
-        const result = isEditing
-            ? await api.updateLead(currentLeadId, leadData)
-            : await api.saveLead(leadData);
-        
+        const result = isEditing ? await api.updateLead(currentLeadId, leadData) : await api.saveLead(leadData);
         ui.showAlert(result.sucesso, 'success');
         resetForm();
         switchToList();
@@ -189,17 +251,14 @@ function handleVendedorClick(lead) {
     if (!vendedorContatoForm) {
         return console.error("ERRO: Formulário do modal 'vendedor-contato-form' não foi encontrado no DOM!");
     }
-    
     currentLeadId = lead.Cpf_CnpjLead;
     vendedorContatoForm.reset();
-    
     vendedorContatoForm.querySelector('[name="Vendedor"]').value = lead.Vendedor || '';
     vendedorContatoForm.querySelector('[name="DataEnvio"]').value = helpers.formatDate(lead.DataEnvio);
     vendedorContatoForm.querySelector('[name="DataValidade"]').value = helpers.formatDate(lead.DataValidade);
     vendedorContatoForm.querySelector('[name="NomeContato"]').value = lead.Contato || '';
     vendedorContatoForm.querySelector('[name="Email"]').value = lead.Email || '';
     vendedorContatoForm.querySelector('[name="Telefone"]').value = lead.Telefone || '';
-    
     ui.showModal('vendedor-modal');
 }
 
@@ -207,10 +266,8 @@ async function handleVendedorSubmit(event) {
     event.preventDefault();
     const vendedorContatoForm = document.getElementById('vendedor-contato-form');
     if (!currentLeadId || !vendedorContatoForm) return;
-
     const formData = new FormData(vendedorContatoForm);
     const data = Object.fromEntries(formData.entries());
-    
     try {
         const result = await api.saveVendedorContato(currentLeadId, data);
         ui.showAlert(result.sucesso, 'success');
@@ -222,7 +279,7 @@ async function handleVendedorSubmit(event) {
 }
 
 export function init() {
-    // Mapeia os elementos do DOM
+    // Mapeamento dos elementos principais
     listingScreen = document.getElementById('cadastro-listing-screen');
     formScreen = document.getElementById('cadastro-form-screen');
     addLeadBtn = document.getElementById('add-lead-btn');
@@ -238,25 +295,32 @@ export function init() {
     cidadeSelect = document.getElementById('cidade');
     clearLeadBtn = document.getElementById('clear-lead-button');
     
-    // Adiciona listener para o formulário do modal APENAS quando ele existir
+    // Mapeamento dos elementos do painel de detalhes
+    detailsPanel = document.getElementById('lead-details-panel');
+    panelBackdrop = document.getElementById('details-panel-backdrop');
+    closePanelBtn = document.getElementById('close-details-panel');
+    panelLeadName = document.getElementById('panel-lead-name');
+    panelCpfCnpj = document.getElementById('panel-cpf-cnpj');
+    panelRazaoSocial = document.getElementById('panel-razao-social');
+    panelUnidadesList = document.getElementById('panel-unidades-list');
+    panelLoadingSpinner = document.getElementById('panel-loading-spinner');
+    panelContent = document.getElementById('panel-content');
+
+    // Listeners do painel
+    if (closePanelBtn) closePanelBtn.addEventListener('click', hideDetailsPanel);
+    if (panelBackdrop) panelBackdrop.addEventListener('click', hideDetailsPanel);
+
+    // Listener para o formulário do modal (que agora temos a certeza que existe)
     const vendedorContatoForm = document.getElementById('vendedor-contato-form');
     if (vendedorContatoForm) {
         vendedorContatoForm.addEventListener('submit', handleVendedorSubmit);
     }
 
-    // Adiciona os outros listeners
     if (addLeadBtn) addLeadBtn.addEventListener('click', () => { resetForm(); switchToForm(); });
     if (backBtn) backBtn.addEventListener('click', switchToList);
     if (clearLeadBtn) clearLeadBtn.addEventListener('click', () => { isEditing ? switchToList() : resetForm(); });
     if (refreshBtn) refreshBtn.addEventListener('click', loadLeads);
     if (leadForm) leadForm.addEventListener('submit', handleFormSubmit);
-    
-    document.body.addEventListener('click', (e) => {
-        const dateInput = e.target.closest('.datepicker-input');
-        if (dateInput) {
-            ui.openCalendar(dateInput);
-        }
-    });
 
     if (filterInput) {
         filterInput.addEventListener('keyup', () => {
@@ -268,7 +332,6 @@ export function init() {
     if (cpfCnpjInput) cpfCnpjInput.addEventListener('blur', (e) => e.target.value = helpers.formatCpfCnpj(e.target.value));
     if (ufSelect) ufSelect.addEventListener('change', () => loadCities(ufSelect.value));
     
-    // Inicia o carregamento dos dados da página
     loadLeads();
     loadStates();
 }

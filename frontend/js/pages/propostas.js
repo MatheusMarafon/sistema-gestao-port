@@ -2,78 +2,16 @@ import * as api from '../api/api.js';
 import * as ui from '../utils/ui.js';
 import * as helpers from '../utils/helpers.js';
 
-// Variáveis de escopo do módulo
+// --- Variáveis de escopo do módulo ---
 let listingScreen, formScreen, addPropostaBtn, backBtn, refreshBtn,
     filterInput, tableBody, propostaForm, leadSelector, unidadeSelector,
-    calendarContainer;
+    clearPropostaBtn;
     
 let isEditing = false;
 let currentPropostaId = null;
 let debounceTimer;
 
-/**
- * Renderiza e abre o modal do calendário.
- * @param {HTMLElement} inputElement - O campo de input de data que receberá o valor.
- */
-function openCalendar(inputElement) {
-    if (!calendarContainer) return;
-
-    const today = new Date();
-    
-    const render = (year, month) => {
-        calendarContainer.innerHTML = '';
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        
-        const header = document.createElement('div');
-        header.className = 'd-flex justify-content-between align-items-center p-2 bg-light border-bottom';
-        header.innerHTML = `
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="prev-month">&lt;</button>
-            <span class="fw-bold">${firstDay.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="next-month">&gt;</button>
-        `;
-
-        const grid = document.createElement('div');
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
-        grid.style.gap = '5px';
-        grid.className = 'p-2';
-
-        ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(dia => {
-            const dayHeader = document.createElement('div');
-            dayHeader.className = 'text-center small text-muted fw-bold';
-            dayHeader.textContent = dia;
-            grid.appendChild(dayHeader);
-        });
-
-        for (let i = 0; i < firstDay.getDay(); i++) grid.appendChild(document.createElement('div'));
-
-        for (let day = 1; day <= lastDay.getDate(); day++) {
-            const dayElement = document.createElement('button');
-            dayElement.type = 'button';
-            dayElement.className = 'btn btn-sm btn-outline-secondary';
-            dayElement.textContent = day;
-            if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
-                dayElement.classList.replace('btn-outline-secondary', 'btn-primary');
-            }
-            dayElement.addEventListener('click', () => {
-                const selectedDate = new Date(year, month, day);
-                inputElement.value = selectedDate.toLocaleDateString('pt-BR');
-                ui.hideModal('calendar-modal');
-            });
-            grid.appendChild(dayElement);
-        }
-        
-        calendarContainer.appendChild(header);
-        calendarContainer.appendChild(grid);
-
-        calendarContainer.querySelector('#prev-month').addEventListener('click', () => render(month === 0 ? year - 1 : year, month === 0 ? 11 : month - 1));
-        calendarContainer.querySelector('#next-month').addEventListener('click', () => render(month === 11 ? year + 1 : year, month === 11 ? 0 : month + 1));
-    };
-
-    render(today.getFullYear(), today.getMonth());
-    ui.showModal('calendar-modal');
-}
+// --- Funções de Renderização e Carregamento ---
 
 async function loadPropostas() {
     if(!tableBody) return;
@@ -103,7 +41,7 @@ function renderPropostasTable(propostas) {
             <td>${p.RazaoSocialLead || ''}</td>
             <td>${p.NomeContato || ''}</td>
             <td>${p.Usuario || ''}</td>
-            <td>
+            <td class="actions-cell">
                 <button type="button" class="btn btn-sm btn-warning btn-edit" title="Editar Proposta"><i class="fas fa-edit"></i></button>
                 <button type="button" class="btn btn-sm btn-danger btn-delete" title="Excluir Proposta"><i class="fas fa-trash-alt"></i></button>
             </td>
@@ -148,21 +86,27 @@ async function loadUnidadesIntoSelector(leadId) {
     }
 }
 
-function switchToForm(isEditMode = false) {
+// --- Funções de Controlo de Ecrã e Formulário ---
+
+function resetPropostaForm() {
     if(propostaForm) propostaForm.reset();
+    if(unidadeSelector) {
+        unidadeSelector.innerHTML = '<option value="">Selecione um lead primeiro</option>';
+        unidadeSelector.disabled = true;
+    }
+    if(leadSelector) leadSelector.selectedIndex = 0;
+}
+
+function switchToForm(isEditMode = false) {
+    resetPropostaForm();
     isEditing = isEditMode;
     currentPropostaId = null;
 
     const formTitle = document.getElementById('proposta-form-title');
     if (formTitle) formTitle.innerHTML = `<i class="fas fa-plus"></i> Nova Proposta`;
 
-    leadSelector.disabled = isEditMode;
-    unidadeSelector.disabled = isEditMode;
+    if(leadSelector) leadSelector.disabled = isEditMode;
     
-    if (!isEditMode) {
-        unidadeSelector.innerHTML = '<option value="">Selecione um lead primeiro</option>';
-    }
-
     listingScreen.classList.add('d-none');
     formScreen.classList.remove('d-none');
 }
@@ -172,10 +116,12 @@ function switchToListing() {
     listingScreen.classList.remove('d-none');
 }
 
+// --- Handlers de Ações (Editar, Excluir, Submeter) ---
+
 async function handleEditClick(proposta) {
     switchToForm(true);
     const formTitle = document.getElementById('proposta-form-title');
-    formTitle.innerHTML = `<i class="fas fa-edit"></i> Editando Proposta #${proposta.NProposta}`;
+    if(formTitle) formTitle.innerHTML = `<i class="fas fa-edit"></i> Editando Proposta #${proposta.NProposta}`;
     currentPropostaId = proposta.NProposta;
     
     try {
@@ -189,7 +135,6 @@ async function handleEditClick(proposta) {
         
         leadSelector.innerHTML = `<option selected>${fullProposta.RazaoSocialLead}</option>`;
         
-        // Busca a unidade para mostrar o nome correto
         const ucResponse = await api.getUnidadesByLead(fullProposta.Cpf_CnpjLead);
         const ucData = ucResponse.find(uc => uc.NumeroDaUcLead === fullProposta.NumeroDaUcLead);
         unidadeSelector.innerHTML = `<option selected>${ucData ? ucData.NomeDaUnidade : fullProposta.NumeroDaUcLead}</option>`;
@@ -199,7 +144,6 @@ async function handleEditClick(proposta) {
         switchToListing();
     }
 }
-
 
 async function handleDeleteClick(proposta) {
     const confirmed = await ui.showConfirm(`Tem certeza que deseja excluir a proposta Nº ${proposta.NProposta}?`); 
@@ -238,6 +182,8 @@ async function handleFormSubmit(event) {
     }
 }
 
+// --- Função de Inicialização ---
+
 export function init() {
     listingScreen = document.getElementById('proposta-listing-screen');
     formScreen = document.getElementById('proposta-form-screen');
@@ -249,12 +195,13 @@ export function init() {
     propostaForm = document.getElementById('proposta-form');
     leadSelector = document.getElementById('proposta-lead-selector');
     unidadeSelector = document.getElementById('proposta-unidade-selector');
-    calendarContainer = document.getElementById('calendar-container');
+    clearPropostaBtn = document.getElementById('clear-proposta-button');
 
     if(addPropostaBtn) addPropostaBtn.addEventListener('click', () => switchToForm(false));
     if(backBtn) backBtn.addEventListener('click', switchToListing);
     if(refreshBtn) refreshBtn.addEventListener('click', loadPropostas);
     if(propostaForm) propostaForm.addEventListener('submit', handleFormSubmit);
+    if(clearPropostaBtn) clearPropostaBtn.addEventListener('click', resetPropostaForm);
     if(leadSelector) leadSelector.addEventListener('change', (e) => loadUnidadesIntoSelector(e.target.value));
 
     if(filterInput) {
@@ -264,15 +211,12 @@ export function init() {
         });
     }
 
-    const appContainer = document.getElementById('app');
-    if (appContainer) {
-        appContainer.addEventListener('click', (e) => {
-            const dateInput = e.target.closest('.datepicker-input');
-            if (dateInput) {
-                openCalendar(dateInput);
-            }
-        });
-    }
+    document.body.addEventListener('click', (e) => {
+        const dateInput = e.target.closest('.datepicker-input');
+        if (dateInput) {
+            ui.openCalendar(dateInput);
+        }
+    });
 
     loadPropostas();
     loadLeadsIntoSelector();
