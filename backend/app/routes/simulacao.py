@@ -1,11 +1,10 @@
-from flask import Blueprint, jsonify, request
-from app.database import get_db_connection
-from app.utils import row_to_dict
-from app.services.simulation_service import realizar_calculo_simulacao
-from config import Config
+# backend/app/routes/simulacao.py (VERSÃO REFATORADA PARA JSON)
+
+from flask import Blueprint, jsonify, request, current_app
+from ..database import read_data  # <-- IMPORTA A NOVA FUNÇÃO!
+from ..services.simulation_service import realizar_calculo_simulacao
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import pyodbc
 
 bp = Blueprint("simulacao", __name__, url_prefix="/api")
 
@@ -21,9 +20,8 @@ def calcular_simulacao_acr():
     except (TypeError, ValueError):
         return jsonify({"erro": "Formato de data inválido. Use dd/mm/yyyy."}), 400
 
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão com o banco de dados."}), 500
+    # Lê todos os dados do nosso "banco" JSON
+    db_data = read_data()
 
     try:
         dados_para_calculo = {
@@ -37,46 +35,53 @@ def calcular_simulacao_acr():
             if not uc_id:
                 return jsonify({"erro": "ID da Unidade é obrigatório."}), 400
 
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM [{Config.UNIDADES_TABLE}] WHERE NumeroDaUcLead = ?",
-                uc_id,
+            unidades_table = current_app.config["UNIDADES_TABLE"]
+            historico_table = current_app.config["HISTORICO_TABLE"]
+
+            # Simula 'SELECT * FROM Unidades WHERE NumeroDaUcLead = ?'
+            unidade_info = next(
+                (
+                    unidade
+                    for unidade in db_data.get(unidades_table, [])
+                    if unidade.get("NumeroDaUcLead") == uc_id
+                ),
+                None,
             )
-            unidade_info = row_to_dict(cursor, cursor.fetchone())
+
             if not unidade_info:
                 return jsonify({"erro": "Unidade não encontrada."}), 404
 
             dados_para_calculo["aliquota_icms"] = unidade_info.get("AliquotaICMS")
 
-            cursor.execute(
-                f"SELECT * FROM [{Config.HISTORICO_TABLE}] WHERE NumeroDaUcLead = ?",
-                uc_id,
-            )
-            historico = [row_to_dict(cursor, r) for r in cursor.fetchall()]
+            # Simula 'SELECT * FROM Historico WHERE NumeroDaUcLead = ?'
+            historico = [
+                h
+                for h in db_data.get(historico_table, [])
+                if h.get("NumeroDaUcLead") == uc_id
+            ]
+
             if not historico:
                 return (
                     jsonify({"erro": "Nenhum histórico de consumo para esta unidade."}),
                     404,
                 )
+
             dados_para_calculo["historico"] = historico
         else:  # tipo 'lead'
             dados_para_calculo["consumo_estimado"] = data.get("consumo_estimado")
             dados_para_calculo["demanda_estimada"] = data.get("demanda_estimada")
             dados_para_calculo["aliquota_icms"] = 17.0  # Valor padrão para leads
 
+        # A chamada ao serviço de cálculo permanece a mesma!
         resultados = realizar_calculo_simulacao(dados_para_calculo)
+
         if resultados is None:
             return jsonify({"erro": "Não foi possível calcular a simulação."}), 400
 
         return jsonify(resultados)
 
-    except pyodbc.Error as e:
-        return jsonify({"erro": f"Erro de banco de dados: {e}"}), 500
     except Exception as e:
         return jsonify({"erro": f"Ocorreu um erro interno: {e}"}), 500
-    finally:
-        if conn:
-            conn.close()
 
 
 @bp.route("/dashboard_data", methods=["POST"])
@@ -90,24 +95,34 @@ def get_dashboard_data():
     except (TypeError, ValueError):
         return jsonify({"erro": "Formato de data inválido."}), 400
 
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
+    db_data = read_data()
 
     try:
         uc_id = data_req.get("uc_id")
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM [{Config.UNIDADES_TABLE}] WHERE NumeroDaUcLead = ?", uc_id
+
+        unidades_table = current_app.config["UNIDADES_TABLE"]
+        historico_table = current_app.config["HISTORICO_TABLE"]
+
+        # Simula 'SELECT * FROM Unidades WHERE NumeroDaUcLead = ?'
+        unidade_info = next(
+            (
+                unidade
+                for unidade in db_data.get(unidades_table, [])
+                if unidade.get("NumeroDaUcLead") == uc_id
+            ),
+            None,
         )
-        unidade_info = row_to_dict(cursor, cursor.fetchone())
+
         if not unidade_info:
             return jsonify({"erro": "Unidade não encontrada."}), 404
 
-        cursor.execute(
-            f"SELECT * FROM [{Config.HISTORICO_TABLE}] WHERE NumeroDaUcLead = ?", uc_id
-        )
-        historico = [row_to_dict(cursor, r) for r in cursor.fetchall()]
+        # Simula 'SELECT * FROM Historico WHERE NumeroDaUcLead = ?'
+        historico = [
+            h
+            for h in db_data.get(historico_table, [])
+            if h.get("NumeroDaUcLead") == uc_id
+        ]
+
         if not historico:
             return jsonify({"erro": "Nenhum histórico encontrado."}), 404
 
@@ -120,6 +135,7 @@ def get_dashboard_data():
         }
 
         cativo_results = realizar_calculo_simulacao(dados_cativo)
+
         if cativo_results is None:
             return (
                 jsonify(
@@ -128,6 +144,7 @@ def get_dashboard_data():
                 400,
             )
 
+        # A lógica de cálculo do dashboard permanece a mesma
         desconto_livre = 0.85
         custo_total_cativo = cativo_results["totais"]["custo_total_periodo"]
         custo_total_livre = custo_total_cativo * desconto_livre
@@ -149,8 +166,6 @@ def get_dashboard_data():
             ],
         }
         return jsonify(dashboard_data)
+
     except Exception as e:
         return jsonify({"erro": f"Ocorreu um erro interno no dashboard: {e}"}), 500
-    finally:
-        if conn:
-            conn.close()

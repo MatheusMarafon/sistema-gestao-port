@@ -1,248 +1,191 @@
-from flask import Blueprint, jsonify, request
-from app.database import get_db_connection
-from app.utils import (
-    row_to_dict,
-    to_float,
-)  # Garante que 'to_float' está a ser importado
-from config import Config
-import pyodbc
+# backend/app/routes/unidades.py (VERSÃO REFATORADA PARA JSON)
+
+from flask import Blueprint, jsonify, request, current_app
+from ..database import read_data, write_data
+from ..services.validation_service import validar_regras_tarifacao
 from datetime import datetime
-from app.services.validation_service import validar_regras_tarifacao
 
 bp = Blueprint("unidades", __name__, url_prefix="/api")
 
 
+# Funções de utilidade (podem ser movidas para utils.py se preferir)
+def to_float(value):
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 @bp.route("/leads/<path:lead_id>/unidades", methods=["GET", "POST"])
 def handle_unidades_by_lead(lead_id):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
+    db_data = read_data()
+    unidades_table = current_app.config["UNIDADES_TABLE"]
 
-    try:
-        cursor = conn.cursor()
-        if request.method == "GET":
-            cursor.execute(
-                f"SELECT * FROM [{Config.UNIDADES_TABLE}] WHERE Cpf_CnpjLead = ?",
-                lead_id,
-            )
-            return jsonify([row_to_dict(cursor, row) for row in cursor.fetchall()])
+    if request.method == "GET":
+        # Filtra a lista de unidades para retornar apenas as do lead_id especificado
+        unidades_do_lead = [
+            unidade
+            for unidade in db_data.get(unidades_table, [])
+            if unidade.get("Cpf_CnpjLead") == lead_id
+        ]
+        return jsonify(unidades_do_lead)
 
-        if request.method == "POST":
-            data = request.json
-            if not data.get("NumeroDaUcLead"):
-                return jsonify({"erro": "O Nº da UC é obrigatório"}), 400
+    if request.method == "POST":
+        data = request.json
+        if not data.get("NumeroDaUcLead"):
+            return jsonify({"erro": "O Nº da UC é obrigatório"}), 400
 
+        try:
             validar_regras_tarifacao(data, data)
+        except ValueError as e:
+            return jsonify({"erro": f"Regra de negócio violada: {e}"}), 400
 
-            sql = f"""INSERT INTO [{Config.UNIDADES_TABLE}] 
-                      (Cpf_CnpjLead, NumeroDaUcLead, CnpjDistribuidora, CnpjDaUnidadeConsumidora, NomeDaUnidade, 
-                       Logradouro, Numero, Complemento, Bairro, Uf, Cidade, Cep, MercadoAtual, SubgrupoTarifario, Tarifa, 
-                       AliquotaICMS, AplicaContaEHidrica, LiminarICMSDemanda, LiminarICMSTusd, BeneficioRuralIrrigacao, 
-                       RuralOuSazoReconhecida, SaldoMaisRecenteSCEE, PossuiUsina, DataRegistroUC) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-
-            params = (
-                lead_id,
-                data.get("NumeroDaUcLead"),
-                data.get("CnpjDistribuidora"),
-                data.get("CnpjDaUnidadeConsumidora"),
-                data.get("NomeDaUnidade"),
-                data.get("Logradouro"),
-                data.get("Numero"),
-                data.get("Complemento"),
-                data.get("Bairro"),
-                data.get("Uf"),
-                # --- CORREÇÃO DE TIPO DE DADOS ---
-                to_float(data.get("Cidade")),
-                data.get("Cep"),
-                data.get("MercadoAtual"),
-                data.get("SubgrupoTarifario"),
-                data.get("Tarifa"),
-                to_float(data.get("AliquotaICMS")),
-                data.get("AplicaContaEHidrica"),
-                data.get("LiminarICMSDemanda"),
-                data.get("LiminarICMSTusd"),
-                to_float(data.get("BeneficioRuralIrrigacao")),
-                data.get("RuralOuSazoReconhecida"),
-                to_float(data.get("SaldoMaisRecenteSCEE")),
-                bool(data.get("PossuiUsina")),
-                datetime.now(),
+        # Simula 'IntegrityError' verificando se a unidade já existe para este lead
+        if any(
+            u.get("NumeroDaUcLead") == data.get("NumeroDaUcLead")
+            and u.get("Cpf_CnpjLead") == lead_id
+            for u in db_data.get(unidades_table, [])
+        ):
+            return (
+                jsonify(
+                    {"erro": "Já existe uma unidade com este número para este lead."}
+                ),
+                409,
             )
-            cursor.execute(sql, params)
-            conn.commit()
-            return jsonify({"sucesso": "Unidade criada com sucesso!"}), 201
 
-    except ValueError as e:
-        return jsonify({"erro": f"Regra de negócio violada: {e}"}), 400
-    except pyodbc.IntegrityError:
-        return (
-            jsonify({"erro": "Já existe uma unidade com este número para este lead."}),
-            409,
+        nova_unidade = (
+            data.copy()
+        )  # Cria uma cópia para não modificar o objeto da requisição
+        nova_unidade["Cpf_CnpjLead"] = lead_id
+        nova_unidade["DataRegistroUC"] = datetime.now().isoformat()
+
+        # Converte os tipos de dados conforme o código original
+        nova_unidade["Cidade"] = to_float(data.get("Cidade"))
+        nova_unidade["AliquotaICMS"] = to_float(data.get("AliquotaICMS"))
+        nova_unidade["BeneficioRuralIrrigacao"] = to_float(
+            data.get("BeneficioRuralIrrigacao")
         )
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+        nova_unidade["SaldoMaisRecenteSCEE"] = to_float(
+            data.get("SaldoMaisRecenteSCEE")
+        )
+        nova_unidade["PossuiUsina"] = bool(data.get("PossuiUsina"))
+
+        db_data.get(unidades_table, []).append(nova_unidade)
+        write_data(db_data)
+
+        return jsonify({"sucesso": "Unidade criada com sucesso!"}), 201
 
 
 @bp.route("/unidade/<path:uc_id>", methods=["GET"])
 def get_unidade_by_id(uc_id):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM [{Config.UNIDADES_TABLE}] WHERE NumeroDaUcLead = ?", uc_id
-        )
-        unidade_row = cursor.fetchone()
-        if not unidade_row:
-            return jsonify({"erro": "Unidade Consumidora não encontrada."}), 404
-        return jsonify(row_to_dict(cursor, unidade_row))
-    except pyodbc.Error as e:
-        return jsonify({"erro": f"Ocorreu um erro interno: {e}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    db_data = read_data()
+    unidades_table = current_app.config["UNIDADES_TABLE"]
+
+    # Encontra a primeira unidade que corresponde ao uc_id
+    unidade_encontrada = next(
+        (
+            unidade
+            for unidade in db_data.get(unidades_table, [])
+            if unidade.get("NumeroDaUcLead") == uc_id
+        ),
+        None,
+    )
+
+    if not unidade_encontrada:
+        return jsonify({"erro": "Unidade Consumidora não encontrada."}), 404
+
+    return jsonify(unidade_encontrada)
 
 
 @bp.route("/unidades/<path:uc_id_original>", methods=["PUT", "DELETE"])
 def update_or_delete_unidade(uc_id_original):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
+    db_data = read_data()
+    unidades_table = current_app.config["UNIDADES_TABLE"]
+    unidades = db_data.get(unidades_table, [])
+
+    if request.method == "PUT":
         data = request.json
-        if request.method == "PUT":
+        try:
             validar_regras_tarifacao(data, data)
-            sql = f"""UPDATE [{Config.UNIDADES_TABLE}] SET 
-                        NumeroDaUcLead = ?, CnpjDistribuidora = ?, CnpjDaUnidadeConsumidora = ?, NomeDaUnidade = ?, 
-                        Logradouro = ?, Numero = ?, Complemento = ?, Bairro = ?, Uf = ?, Cidade = ?, Cep = ?, 
-                        MercadoAtual = ?, SubgrupoTarifario = ?, Tarifa = ?, AliquotaICMS = ?, AplicaContaEHidrica = ?, 
-                        LiminarICMSDemanda = ?, LiminarICMSTusd = ?, BeneficioRuralIrrigacao = ?, RuralOuSazoReconhecida = ?, 
-                        SaldoMaisRecenteSCEE = ?, PossuiUsina = ? WHERE NumeroDaUcLead = ? AND Cpf_CnpjLead = ?"""
-            params = (
-                data.get("NumeroDaUcLead"),
-                data.get("CnpjDistribuidora"),
-                data.get("CnpjDaUnidadeConsumidora"),
-                data.get("NomeDaUnidade"),
-                data.get("Logradouro"),
-                data.get("Numero"),
-                data.get("Complemento"),
-                data.get("Bairro"),
-                data.get("Uf"),
-                # --- CORREÇÃO DE TIPO DE DADOS ---
-                to_float(data.get("Cidade")),
-                data.get("Cep"),
-                data.get("MercadoAtual"),
-                data.get("SubgrupoTarifario"),
-                data.get("Tarifa"),
-                to_float(data.get("AliquotaICMS")),
-                data.get("AplicaContaEHidrica"),
-                data.get("LiminarICMSDemanda"),
-                data.get("LiminarICMSTusd"),
-                to_float(data.get("BeneficioRuralIrrigacao")),
-                data.get("RuralOuSazoReconhecida"),
-                to_float(data.get("SaldoMaisRecenteSCEE")),
-                bool(data.get("PossuiUsina")),
-                uc_id_original,
-                data.get("Cpf_CnpjLead"),
-            )
-            cursor.execute(sql, params)
-            conn.commit()
-            if cursor.rowcount == 0:
-                return (
-                    jsonify({"erro": "Nenhuma unidade encontrada para atualizar."}),
-                    404,
-                )
-            return jsonify({"sucesso": "Unidade atualizada com sucesso!"})
+        except ValueError as e:
+            return jsonify({"erro": f"Regra de negócio violada: {e}"}), 400
 
-        if request.method == "DELETE":
-            lead_id = data.get("Cpf_CnpjLead")
-            if not lead_id:
-                return (
-                    jsonify({"erro": "CPF/CNPJ do lead é necessário para exclusão."}),
-                    400,
-                )
+        unidade_atualizada = False
+        for unidade in unidades:
+            if unidade.get("NumeroDaUcLead") == uc_id_original and unidade.get(
+                "Cpf_CnpjLead"
+            ) == data.get("Cpf_CnpjLead"):
+                unidade.update(data)  # Atualiza o dicionário com os novos dados
+                unidade_atualizada = True
+                break
 
-            cursor.execute(
-                f"DELETE FROM [{Config.HISTORICO_TABLE}] WHERE NumeroDaUcLead = ?",
-                uc_id_original,
-            )
-            cursor.execute(
-                f"DELETE FROM [{Config.UNIDADES_TABLE}] WHERE NumeroDaUcLead = ? AND Cpf_CnpjLead = ?",
-                uc_id_original,
-                lead_id,
-            )
-            conn.commit()
-            if cursor.rowcount == 0:
-                return (
-                    jsonify(
-                        {
-                            "erro": "Unidade não encontrada ou não pertence ao lead informado."
-                        }
-                    ),
-                    404,
-                )
-            return jsonify({"sucesso": "Unidade e seu histórico foram excluídos."})
+        if not unidade_atualizada:
+            return jsonify({"erro": "Nenhuma unidade encontrada para atualizar."}), 404
 
-    except ValueError as e:
-        return jsonify({"erro": f"Regra de negócio violada: {e}"}), 400
-    except pyodbc.Error as e:
-        return jsonify({"erro": f"Erro de banco de dados: {e}"}), 500
-    finally:
-        if conn:
-            conn.close()
+        write_data(db_data)
+        return jsonify({"sucesso": "Unidade atualizada com sucesso!"})
+
+    if request.method == "DELETE":
+        data = request.json
+        lead_id = data.get("Cpf_CnpjLead")
+        if not lead_id:
+            return (
+                jsonify({"erro": "CPF/CNPJ do lead é necessário para exclusão."}),
+                400,
+            )
+
+        unidades_antes = len(unidades)
+        historico_table = current_app.config["HISTORICO_TABLE"]
+
+        # Recria as listas, excluindo os registros a serem deletados
+        db_data[unidades_table] = [
+            u
+            for u in unidades
+            if not (
+                u.get("NumeroDaUcLead") == uc_id_original
+                and u.get("Cpf_CnpjLead") == lead_id
+            )
+        ]
+        db_data[historico_table] = [
+            h
+            for h in db_data.get(historico_table, [])
+            if h.get("NumeroDaUcLead") != uc_id_original
+        ]
+
+        if len(db_data[unidades_table]) == unidades_antes:
+            return (
+                jsonify(
+                    {
+                        "erro": "Unidade não encontrada ou não pertence ao lead informado."
+                    }
+                ),
+                404,
+            )
+
+        write_data(db_data)
+        return jsonify({"sucesso": "Unidade e seu histórico foram excluídos."})
 
 
 @bp.route("/unidades/<path:uc_id>/historico", methods=["GET"])
 def get_all_historico(uc_id):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
-        query = f"SELECT * FROM [{Config.HISTORICO_TABLE}] WHERE TRIM(NumeroDaUcLead) = ? ORDER BY IDMes DESC"
-        cursor.execute(query, uc_id)
-        historico = [row_to_dict(cursor, r) for r in cursor.fetchall()]
-        for item in historico:
-            if item.get("IDMes"):
-                id_mes_str = str(item["IDMes"])
-                if len(id_mes_str) == 6:
-                    item["IDMes"] = f"{id_mes_str[:4]}-{id_mes_str[4:]}"
-        return jsonify(historico)
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    db_data = read_data()
+    historico_table = current_app.config["HISTORICO_TABLE"]
 
+    historico_filtrado = [
+        h
+        for h in db_data.get(historico_table, [])
+        if str(h.get("NumeroDaUcLead")).strip() == uc_id
+    ]
+    historico_filtrado.sort(key=lambda x: x.get("IDMes", 0), reverse=True)
 
-@bp.route("/unidades/<path:uc_id>/historico/<int:ano>", methods=["GET"])
-def get_historico_by_year(uc_id, ano):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
-        start_idmes = ano * 100 + 1
-        end_idmes = ano * 100 + 12
-        query = f"SELECT * FROM [{Config.HISTORICO_TABLE}] WHERE NumeroDaUcLead = ? AND IDMes >= ? AND IDMes <= ? ORDER BY IDMes ASC"
-        cursor.execute(query, uc_id, start_idmes, end_idmes)
-        historico = [row_to_dict(cursor, r) for r in cursor.fetchall()]
-        for item in historico:
-            if item.get("IDMes"):
-                id_mes_str = str(item["IDMes"])
-                if len(id_mes_str) == 6:
-                    item["IDMes"] = f"{id_mes_str[:4]}-{id_mes_str[4:]}"
-        return jsonify(historico)
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    # Formata o campo IDMes
+    for item in historico_filtrado:
+        if item.get("IDMes"):
+            id_mes_str = str(item["IDMes"])
+            if len(id_mes_str) == 6:
+                item["IDMes"] = f"{id_mes_str[:4]}-{id_mes_str[4:]}"
+
+    return jsonify(historico_filtrado)
 
 
 @bp.route("/unidades/<path:uc_id>/historico/batch", methods=["POST"])
@@ -250,73 +193,55 @@ def batch_update_historico(uc_id):
     data = request.json
     ano = data.get("ano")
     dados_meses = data.get("dados")
-
     if not ano or dados_meses is None:
         return jsonify({"erro": "Ano e dados do histórico são obrigatórios."}), 400
 
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
+    db_data = read_data()
+    unidades_table = current_app.config["UNIDADES_TABLE"]
+    historico_table = current_app.config["HISTORICO_TABLE"]
+
+    unidade_info = next(
+        (
+            u
+            for u in db_data.get(unidades_table, [])
+            if u.get("NumeroDaUcLead") == uc_id
+        ),
+        None,
+    )
+    if not unidade_info:
+        return jsonify({"erro": "Unidade não encontrada para validação."}), 404
 
     try:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT * FROM [{Config.UNIDADES_TABLE}] WHERE NumeroDaUcLead = ?", uc_id
-        )
-        unidade_info = row_to_dict(cursor, cursor.fetchone())
-        if not unidade_info:
-            return jsonify({"erro": "Unidade não encontrada para validação."}), 404
-
         for mes_data in dados_meses:
             validar_regras_tarifacao(unidade_info, mes_data)
+    except ValueError as e:
+        return jsonify({"erro": f"Regra de negócio violada: {e}"}), 400
 
-        conn.autocommit = False
-        start_id, end_id = int(ano) * 100 + 1, int(ano) * 100 + 12
-        cursor.execute(
-            f"DELETE FROM [{Config.HISTORICO_TABLE}] WHERE NumeroDaUcLead = ? AND IDMes >= ? AND IDMes <= ?",
-            uc_id,
-            start_id,
-            end_id,
+    # Simula a transação DELETE + INSERT
+    start_id, end_id = int(ano) * 100 + 1, int(ano) * 100 + 12
+    historico_atual = db_data.get(historico_table, [])
+
+    # Mantém apenas os registros que NÃO estão no intervalo a ser atualizado
+    historico_atualizado = [
+        h
+        for h in historico_atual
+        if not (
+            h.get("NumeroDaUcLead") == uc_id
+            and start_id <= int(str(h.get("IDMes")).replace("-", "")) <= end_id
         )
+    ]
 
-        insert_sql = f"""INSERT INTO [{Config.HISTORICO_TABLE}] 
-                         (NumeroDaUcLead, IDMes, DemandaCP, DemandaCFP, DemandaCG, kWProjPonta, kWProjForaPonta, kWhProjPonta, 
-                          kWhProjForaPonta, kWhProjHRes, kWhProjPontaG, kWhProjForaPontaG, kWProjG, kWhProjDieselP, 
-                          kWhCompensadoP, kWhCompensadoFP, kWhCompensadoHr, kWGeracaoProjetada, DataRegistroHistorico) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    # Adiciona os novos registros
+    novos_registros = []
+    for mes_data in dados_meses:
+        novo_registro = mes_data.copy()
+        novo_registro["NumeroDaUcLead"] = uc_id
+        novo_registro["IDMes"] = int(str(mes_data.get("IDMes")).replace("-", ""))
+        novo_registro["DataRegistroHistorico"] = datetime.now().isoformat()
+        novos_registros.append(novo_registro)
 
-        for mes_data in dados_meses:
-            params = (
-                uc_id,
-                int(str(mes_data.get("IDMes")).replace("-", "")),
-                to_float(mes_data.get("DemandaCP")),
-                to_float(mes_data.get("DemandaCFP")),
-                to_float(mes_data.get("DemandaCG")),
-                to_float(mes_data.get("kWProjPonta")),
-                to_float(mes_data.get("kWProjForaPonta")),
-                to_float(mes_data.get("kWhProjPonta")),
-                to_float(mes_data.get("kWhProjForaPonta")),
-                to_float(mes_data.get("kWhProjHRes")),
-                to_float(mes_data.get("kWhProjPontaG")),
-                to_float(mes_data.get("kWhProjForaPontaG")),
-                to_float(mes_data.get("kWProjG")),
-                to_float(mes_data.get("kWhProjDieselP")),
-                to_float(mes_data.get("kWhCompensadoP")),
-                to_float(mes_data.get("kWhCompensadoFP")),
-                to_float(mes_data.get("kWhCompensadoHr")),
-                to_float(mes_data.get("kWGeracaoProjetada")),
-                datetime.now(),
-            )
-            cursor.execute(insert_sql, params)
+    historico_atualizado.extend(novos_registros)
+    db_data[historico_table] = historico_atualizado
 
-        conn.commit()
-        return jsonify({"sucesso": f"Histórico para o ano {ano} salvo com sucesso!"})
-
-    except Exception as e:
-        conn.rollback()
-        print(f"[ERRO CRÍTICO EM BATCH UPDATE]: {e}")
-        return jsonify({"erro": f"Ocorreu um erro inesperado no servidor: {e}"}), 500
-    finally:
-        if conn:
-            conn.autocommit = True
-            conn.close()
+    write_data(db_data)
+    return jsonify({"sucesso": f"Histórico para o ano {ano} salvo com sucesso!"})

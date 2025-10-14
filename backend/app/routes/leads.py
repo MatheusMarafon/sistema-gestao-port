@@ -1,187 +1,164 @@
-from flask import Blueprint, jsonify, request
-from app.database import get_db_connection
-from app.utils import row_to_dict, to_int
-from config import Config
-import pyodbc
+# backend/app/routes/leads.py (VERSÃO FINAL CORRIGIDA PARA JSON)
+
+from flask import Blueprint, jsonify, request, current_app
+from ..database import read_data, write_data  # <-- Importa as novas funções!
 from datetime import datetime
 
+# Cria o Blueprint para as rotas de leads
 bp = Blueprint("leads", __name__, url_prefix="/api/leads")
 
 
 @bp.route("", methods=["GET", "POST"])
 def handle_leads():
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão com o banco de dados."}), 500
+    # Para operações com JSON, lemos o "banco de dados" no início de cada requisição
+    db_data = read_data()
 
-    try:
-        cursor = conn.cursor()
-        if request.method == "GET":
-            filtro = request.args.get("filtro", "")
-            query = f"""
-                SELECT l.*, v.Vendedor, c.NomeContato AS Contato 
-                FROM (({Config.LEADS_TABLE} AS l 
-                LEFT JOIN {Config.VENDEDORES_TABLE} AS v ON l.Cpf_CnpjLead = v.Cpf_CnpjLead) 
-                LEFT JOIN {Config.CONTATOS_TABLE} AS c ON l.Cpf_CnpjLead = c.Cpf_CnpjLead)
-            """
-            params = []
-            if filtro:
-                query += " WHERE l.RazaoSocialLead LIKE ? OR l.Cpf_CnpjLead LIKE ? OR l.NomeFantasia LIKE ?"
-                filtro_param = f"%{filtro}%"
-                params.extend([filtro_param, filtro_param, filtro_param])
-            query += " ORDER BY l.DataResgistroLead DESC"
-            cursor.execute(query, params)
-            leads = [row_to_dict(cursor, row) for row in cursor.fetchall()]
-            return jsonify(leads)
+    if request.method == "GET":
+        filtro = request.args.get("filtro", "").lower()
 
-        if request.method == "POST":
-            novo_lead = request.json
-            if (
-                not novo_lead
-                or not novo_lead.get("Cpf_CnpjLead")
-                or not novo_lead.get("RazaoSocialLead")
-            ):
-                return (
-                    jsonify({"erro": "CPF/CNPJ e Razão Social são obrigatórios"}),
-                    400,
-                )
+        # Pega os nomes das "tabelas" do app config
+        leads_table = current_app.config["LEADS_TABLE"]
+        vendedores_table = current_app.config["VENDEDORES_TABLE"]
+        contatos_table = current_app.config["CONTATOS_TABLE"]
 
-            sql = f"""INSERT INTO [{Config.LEADS_TABLE}] 
-                      (Cpf_CnpjLead, RazaoSocialLead, NomeFantasia, Cnae, Logradouro, Numero, Complemento, Bairro, Uf, Cidade, Cep, DataResgistroLead, UsuriaEditorRegistro) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-            params = (
-                novo_lead.get("Cpf_CnpjLead"),
-                novo_lead.get("RazaoSocialLead"),
-                novo_lead.get("NomeFantasia"),
-                novo_lead.get("Cnae"),
-                novo_lead.get("Logradouro"),
-                novo_lead.get("Numero"),
-                novo_lead.get("Complemento"),
-                novo_lead.get("Bairro"),
-                novo_lead.get("Uf"),
-                to_int(novo_lead.get("Cidade")),
-                novo_lead.get("Cep"),
-                datetime.now(),
-                novo_lead.get("UsuriaEditorRegistro"),
-            )
-            cursor.execute(sql, params)
-            conn.commit()
-            return jsonify({"sucesso": "Lead criado com sucesso"}), 201
+        # Pega as listas de dados do nosso "banco" JSON
+        leads = db_data.get(leads_table, [])
+        vendedores = db_data.get(vendedores_table, [])
+        contatos = db_data.get(contatos_table, [])
 
-    except pyodbc.IntegrityError:
-        return jsonify({"erro": "Este CPF/CNPJ já existe na base de dados."}), 409
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+        # --- SIMULAÇÃO DE 'LEFT JOIN' ---
+        # Cria dicionários para busca rápida, evitando loops aninhados
+        vendedores_map = {v["Cpf_CnpjLead"]: v for v in vendedores}
+        contatos_map = {c["Cpf_CnpjLead"]: c for c in contatos}
+
+        resultados = []
+        for lead in leads:
+            # Cria uma cópia para não modificar a "tabela" original em memória
+            lead_copy = lead.copy()
+
+            vendedor_info = vendedores_map.get(lead_copy.get("Cpf_CnpjLead"))
+            if vendedor_info:
+                lead_copy["Vendedor"] = vendedor_info.get("Vendedor")
+
+            contato_info = contatos_map.get(lead_copy.get("Cpf_CnpjLead"))
+            if contato_info:
+                lead_copy["Contato"] = contato_info.get("NomeContato")
+
+            resultados.append(lead_copy)
+
+        # --- SIMULAÇÃO DE FILTRO 'LIKE' ---
+        if filtro:
+            resultados_filtrados = [
+                lead
+                for lead in resultados
+                if filtro in str(lead.get("RazaoSocialLead", "")).lower()
+                or filtro in str(lead.get("Cpf_CnpjLead", "")).lower()
+                or filtro in str(lead.get("NomeFantasia", "")).lower()
+            ]
+            resultados = resultados_filtrados
+
+        # --- SIMULAÇÃO DE 'ORDER BY' ---
+        resultados.sort(
+            key=lambda x: x.get("DataResgistroLead", "1900-01-01"), reverse=True
+        )
+
+        return jsonify(resultados)
+
+    if request.method == "POST":
+        novo_lead = request.json
+        if (
+            not novo_lead
+            or not novo_lead.get("Cpf_CnpjLead")
+            or not novo_lead.get("RazaoSocialLead")
+        ):
+            return jsonify({"erro": "CPF/CNPJ e Razão Social são obrigatórios"}), 400
+
+        leads_table = current_app.config["LEADS_TABLE"]
+
+        # Verifica se o lead já existe (simulação de 'IntegrityError')
+        if any(
+            lead.get("Cpf_CnpjLead") == novo_lead.get("Cpf_CnpjLead")
+            for lead in db_data[leads_table]
+        ):
+            return jsonify({"erro": "Este CPF/CNPJ já existe na base de dados."}), 409
+
+        # Adiciona dados automáticos
+        novo_lead["DataResgistroLead"] = datetime.now().isoformat()
+
+        db_data[leads_table].append(novo_lead)
+        write_data(db_data)
+
+        return jsonify({"sucesso": "Lead criado com sucesso"}), 201
 
 
 @bp.route("/<path:lead_id>", methods=["GET", "PUT"])
 def handle_lead_by_id(lead_id):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
-        if request.method == "GET":
-            cursor.execute(
-                f"SELECT * FROM [{Config.LEADS_TABLE}] WHERE Cpf_CnpjLead = ?", lead_id
-            )
-            row = cursor.fetchone()
-            if not row:
-                return jsonify({"erro": "Lead não encontrado"}), 404
-            return jsonify(row_to_dict(cursor, row))
+    db_data = read_data()
+    leads_table = current_app.config["LEADS_TABLE"]
+    leads = db_data.get(leads_table, [])
 
-        if request.method == "PUT":
-            dados_lead = request.json
-            sql = f"""UPDATE [{Config.LEADS_TABLE}] SET 
-                      RazaoSocialLead = ?, NomeFantasia = ?, Cnae = ?, Logradouro = ?, 
-                      Numero = ?, Complemento = ?, Bairro = ?, Uf = ?, Cidade = ?, 
-                      Cep = ?, UsuriaEditorRegistro = ? WHERE Cpf_CnpjLead = ?"""
-            params = (
-                dados_lead.get("RazaoSocialLead"),
-                dados_lead.get("NomeFantasia"),
-                dados_lead.get("Cnae"),
-                dados_lead.get("Logradouro"),
-                dados_lead.get("Numero"),
-                dados_lead.get("Complemento"),
-                dados_lead.get("Bairro"),
-                dados_lead.get("Uf"),
-                to_int(dados_lead.get("Cidade")),
-                dados_lead.get("Cep"),
-                dados_lead.get("UsuriaEditorRegistro"),
-                lead_id,
-            )
-            cursor.execute(sql, params)
-            conn.commit()
-            if cursor.rowcount == 0:
-                return jsonify({"erro": "Lead não encontrado para atualizar"}), 404
-            return jsonify({"sucesso": "Lead atualizado com sucesso"})
+    # Encontra o lead e seu índice na lista
+    lead_encontrado = None
+    indice_lead = -1
+    for i, lead in enumerate(leads):
+        if lead.get("Cpf_CnpjLead") == lead_id:
+            lead_encontrado = lead
+            indice_lead = i
+            break
 
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    if not lead_encontrado:
+        return jsonify({"erro": "Lead não encontrado"}), 404
+
+    if request.method == "GET":
+        return jsonify(lead_encontrado)
+
+    if request.method == "PUT":
+        dados_atualizacao = request.json
+        lead_encontrado.update(dados_atualizacao)
+
+        # Atualiza o lead na lista original
+        db_data[leads_table][indice_lead] = lead_encontrado
+
+        write_data(db_data)
+        return jsonify({"sucesso": "Lead atualizado com sucesso"})
 
 
 @bp.route("/<path:lead_id>/vendedor-contato", methods=["POST"])
 def add_vendedor_contato(lead_id):
-    """Adiciona ou atualiza as informações de vendedor e contato para um lead."""
     data = request.json
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"erro": "Falha na conexão."}), 500
-    try:
-        cursor = conn.cursor()
-        # Limpa os registos antigos para garantir que a informação é sempre a mais recente (upsert)
-        cursor.execute(
-            f"DELETE FROM [{Config.VENDEDORES_TABLE}] WHERE Cpf_CnpjLead = ?", lead_id
-        )
-        cursor.execute(
-            f"DELETE FROM [{Config.CONTATOS_TABLE}] WHERE Cpf_CnpjLead = ?", lead_id
-        )
+    db_data = read_data()
 
-        # Insere os novos dados do vendedor, se existirem
-        if data.get("Vendedor"):
-            try:
-                data_envio = (
-                    datetime.strptime(data["DataEnvio"], "%d/%m/%Y")
-                    if data.get("DataEnvio")
-                    else None
-                )
-                data_validade = (
-                    datetime.strptime(data["DataValidade"], "%d/%m/%Y")
-                    if data.get("DataValidade")
-                    else None
-                )
-                sql_vendedor = f"INSERT INTO [{Config.VENDEDORES_TABLE}] (Cpf_CnpjLead, Vendedor, DataDeEnvioLead, ValidadeLead) VALUES (?, ?, ?, ?)"
-                cursor.execute(
-                    sql_vendedor, lead_id, data["Vendedor"], data_envio, data_validade
-                )
-            except (ValueError, TypeError) as e:
-                return jsonify({"erro": f"Formato de data inválido: {e}"}), 400
+    vendedores_table = current_app.config["VENDEDORES_TABLE"]
+    contatos_table = current_app.config["CONTATOS_TABLE"]
 
-        # Insere os novos dados do contato, se existirem
-        if data.get("NomeContato"):
-            sql_contato = f"INSERT INTO [{Config.CONTATOS_TABLE}] (Cpf_CnpjLead, NomeContato, [e-mail], Telefone) VALUES (?, ?, ?, ?)"
-            cursor.execute(
-                sql_contato,
-                lead_id,
-                data["NomeContato"],
-                data.get("Email"),
-                data.get("Telefone"),
-            )
+    # Filtra as listas, mantendo apenas os registros que NÃO são do lead_id atual
+    db_data[vendedores_table] = [
+        v for v in db_data.get(vendedores_table, []) if v.get("Cpf_CnpjLead") != lead_id
+    ]
+    db_data[contatos_table] = [
+        c for c in db_data.get(contatos_table, []) if c.get("Cpf_CnpjLead") != lead_id
+    ]
 
-        conn.commit()
-        return (
-            jsonify({"sucesso": "Informações de Vendedor/Contato salvas com sucesso!"}),
-            201,
-        )
+    if data.get("Vendedor"):
+        novo_vendedor = {
+            "Cpf_CnpjLead": lead_id,
+            "Vendedor": data.get("Vendedor"),
+            "DataDeEnvioLead": data.get("DataEnvio"),  # Armazena como string
+            "ValidadeLead": data.get("DataValidade"),  # Armazena como string
+        }
+        db_data[vendedores_table].append(novo_vendedor)
 
-    except pyodbc.Error as ex:
-        return jsonify({"erro": f"Erro de banco de dados: {ex}"}), 500
-    finally:
-        if conn:
-            conn.close()
+    if data.get("NomeContato"):
+        novo_contato = {
+            "Cpf_CnpjLead": lead_id,
+            "NomeContato": data.get("NomeContato"),
+            "e-mail": data.get("Email"),
+            "Telefone": data.get("Telefone"),
+        }
+        db_data[contatos_table].append(novo_contato)
+
+    write_data(db_data)
+    return (
+        jsonify({"sucesso": "Informações de Vendedor/Contato salvas com sucesso!"}),
+        201,
+    )

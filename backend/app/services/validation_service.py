@@ -1,4 +1,4 @@
-from app.utils import to_float
+from ..utils import to_float
 
 
 def validar_regras_tarifacao(dados_unidade, dados_historico_mes):

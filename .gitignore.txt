@@ -1,15 +1,16 @@
-# Cache e bytecode do Python
+# .gitignore
+
+# Pasta de dados, configurações e arquivos que não devem ir para o repositório
+instance/
+
+# Arquivos de cache e compilação do Python
 __pycache__/
 *.pyc
 
-# Pastas de ambiente virtual
+# Pasta de ambiente virtual (se você usar uma)
 venv/
-env/
 .venv/
+env/
 
-# Arquivos do VS Code
+# Arquivos do editor (ex: VS Code)
 .vscode/
-
-# Arquivos de sistema
-.DS_Store
-Thumbs.db
