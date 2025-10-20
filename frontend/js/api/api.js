@@ -5,7 +5,7 @@
  */
 
 // A URL base da sua API. Se o endereço do backend mudar, altere apenas aqui.
-const BASE_URL = 'http://127.0.0.1:5000/api';
+const BASE_URL = '/api';
 
 /**
  * Função genérica para realizar requisições à API.
